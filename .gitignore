@@ -1,0 +1,7 @@
+build
+vendor
+storage
+.vscode
+*.env
+*.log
+.DS_Store
