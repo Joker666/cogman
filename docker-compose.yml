@@ -20,7 +20,7 @@ services:
     - 15672:15672
 
   redis:
-    image: redis:4-alpine
+    image: redis:5-alpine
     command: ["--appendonly", "yes"]
     volumes:
     - ./storage/redis:/data
