@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Tapfury/cogman/config"
+
 	"github.com/gomodule/redigo/redis"
 	"github.com/streadway/amqp"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -24,10 +26,10 @@ type Server struct {
 	tasks map[string]Handler
 	mu    sync.RWMutex
 
-	cfg *Config
+	cfg *config.Server
 }
 
-func NewServer(cfg Config) (*Server, error) {
+func NewServer(cfg config.Server) (*Server, error) {
 	acl, err := amqp.Dial(cfg.AMQP.URI)
 	if err != nil {
 		return nil, err
@@ -40,7 +42,7 @@ func NewServer(cfg Config) (*Server, error) {
 		MaxIdle:     5,
 		IdleTimeout: 300 * time.Second,
 		Dial: func() (redis.Conn, error) {
-			return redis.DialURL(cfg.RedisURI)
+			return redis.DialURL(cfg.Redis.URI)
 		},
 	}
 
@@ -51,7 +53,7 @@ func NewServer(cfg Config) (*Server, error) {
 		return nil, err
 	}
 
-	mcl, err := mongo.Connect(context.Background(), options.Client().ApplyURI(cfg.MongoURI))
+	mcl, err := mongo.Connect(context.Background(), options.Client().ApplyURI(cfg.Mongo.URI))
 	if err != nil {
 		return nil, err
 	}
