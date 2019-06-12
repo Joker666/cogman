@@ -20,3 +20,7 @@ type Mongo struct {
 type Redis struct {
 	URI string
 }
+
+type Client struct {
+	AMQP AMQP
+}
