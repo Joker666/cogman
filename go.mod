@@ -7,6 +7,7 @@ require (
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/gomodule/redigo v1.7.1-0.20190322064113-39e2c31b7ca3
 	github.com/google/go-cmp v0.3.0 // indirect
+	github.com/google/uuid v1.1.1
 	github.com/streadway/amqp v0.0.0-20190404075320-75d898a42a94
 	github.com/stretchr/testify v1.3.0 // indirect
 	github.com/tidwall/pretty v1.0.0 // indirect

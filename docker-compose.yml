@@ -13,6 +13,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
+    restart: always
     volumes:
     - ./storage/rabbitmq:/var/lib/rabbitmq
     ports:
@@ -22,6 +23,7 @@ services:
   redis:
     image: redis:5-alpine
     command: ["--appendonly", "yes"]
+    restart: always
     volumes:
     - ./storage/redis:/data
     ports:

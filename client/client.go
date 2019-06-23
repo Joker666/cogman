@@ -1,24 +1,229 @@
 package client
 
 import (
+	"context"
+	"errors"
+	"sync"
+	"time"
+
 	"github.com/Tapfury/cogman/config"
+	"github.com/google/uuid"
+	"github.com/streadway/amqp"
 )
 
-type Client struct {
+// Session holds necessery fields of a client session
+type Session struct {
 	cfg *config.Client
+
+	mu        sync.RWMutex
+	connected bool
+
+	conn *amqp.Connection
+
+	done   chan struct{}
+	reconn chan *amqp.Error
 }
 
+// NewSession creates new client session with config cfg
+func NewSession(cfg config.Client) (*Session, error) {
+	if cfg.ConnectionTimeout < 0 || cfg.RequestTimeout < 0 {
+		return nil, ErrInvalidConfig
+	}
+	return &Session{
+		cfg: &cfg,
+	}, nil
+}
+
+// Close closes session s
+func (s *Session) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.connected = false
+
+	close(s.done)
+
+	return s.conn.Close()
+}
+
+// Connect connects a client session
+func (s *Session) Connect() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.connected {
+		return nil
+	}
+
+	s.done = make(chan struct{})
+
+	ctx := context.Background()
+	var cancel context.CancelFunc
+
+	if s.cfg.ConnectionTimeout != 0 {
+		ctx, cancel = context.WithTimeout(ctx, s.cfg.ConnectionTimeout)
+		defer cancel()
+	}
+
+	err := s.connect(ctx)
+	if err != nil {
+		return err
+	}
+
+	s.connected = true
+
+	go func() {
+		s.handleReconnect()
+	}()
+
+	return nil
+}
+
+func (s *Session) connect(ctx context.Context) error {
+	errCh := make(chan error)
+
+	var (
+		conn *amqp.Connection
+		err  error
+	)
+
+	go func() {
+		conn, err = amqp.Dial(s.cfg.AMQP.URI)
+		errCh <- err
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ErrConnectionTimeout
+	case <-errCh:
+	}
+
+	if err != nil {
+		return err
+	}
+
+	s.conn = conn
+	s.reconn = s.conn.NotifyClose(make(chan *amqp.Error))
+
+	return nil
+}
+
+func (s *Session) handleReconnect() error {
+
+	var err error
+	for {
+		select {
+		case <-s.done:
+			return nil
+		case err = <-s.reconn:
+			s.connected = false
+		}
+
+		done := (<-chan time.Time)(make(chan time.Time))
+		ctx := context.Background()
+		cancel := context.CancelFunc(func() {})
+
+		if s.cfg.ConnectionTimeout != 0 {
+			done = time.After(s.cfg.ConnectionTimeout)
+			ctx, cancel = context.WithTimeout(context.Background(), s.cfg.ConnectionTimeout)
+			defer cancel()
+		}
+
+		for {
+			select {
+			case <-done:
+				return err
+			case <-time.After(100 * time.Millisecond):
+			}
+			if err = s.connect(ctx); err == nil {
+				break
+			}
+		}
+
+		cancel()
+
+		s.connected = true
+	}
+}
+
+// Task represents a task
 type Task struct {
-	Name string
+	Name    string
 	Payload []byte
-	
+
 	id string
 }
 
-func (t *Task)ID() string {
+// ID returns the task id
+func (t *Task) ID() string {
 	return t.id
 }
 
-func (c *Client)SendTask(t *Task) error {
-	
+// List of available errors
+var (
+	ErrNotConnected      = errors.New("cogman: client not connected")
+	ErrNotPublished      = errors.New("cogman: task not published")
+	ErrInvalidConfig     = errors.New("cogman: invalid client config")
+	ErrRequestTimeout    = errors.New("cogman: request timeout")
+	ErrConnectionTimeout = errors.New("cogman: connection timeout")
+)
+
+// SendTask sends task t
+func (s *Session) SendTask(t *Task) error {
+	s.mu.RLock()
+	if !s.connected {
+		return ErrNotConnected
+	}
+	s.mu.RUnlock()
+
+	ch, err := s.conn.Channel()
+	if err != nil {
+		return err
+	}
+	defer ch.Close()
+
+	if err := ch.Confirm(false); err != nil {
+		return err
+	}
+
+	id := uuid.New().String()
+
+	close := ch.NotifyClose(make(chan *amqp.Error))
+	publish := ch.NotifyPublish(make(chan amqp.Confirmation))
+
+	err = ch.Publish(
+		s.cfg.AMQP.Exchange,
+		s.cfg.AMQP.Queue,
+		false,
+		false,
+		amqp.Publishing{
+			Type:         t.Name,
+			MessageId:    id,
+			DeliveryMode: amqp.Persistent,
+			Body:         t.Payload,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	done := (<-chan time.Time)(make(chan time.Time))
+	if s.cfg.RequestTimeout != 0 {
+		done = time.After(s.cfg.RequestTimeout)
+	}
+
+	select {
+	case err := <-close:
+		return err
+	case p := <-publish:
+		if !p.Ack {
+			return ErrNotPublished
+		}
+	case <-done:
+		return ErrRequestTimeout
+	}
+
+	t.id = id
+
+	return nil
 }
