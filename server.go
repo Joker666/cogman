@@ -319,15 +319,20 @@ func (s *Server) consume(ctx context.Context, queue string, prefetch int) error 
 	for {
 		var msg amqp.Delivery
 
+		done := false
 		select {
 		case <-ctx.Done():
 			s.debug("got done signal")
-			break
+			done = true
 		case err = <-errCh:
 			s.debug("got error in channel")
-			break
+			done = true
 		case msg = <-msgs:
 			s.debug("got new task")
+		}
+
+		if done {
+			break
 		}
 
 		hdr := msg.Headers
