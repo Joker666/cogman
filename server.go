@@ -84,7 +84,8 @@ func NewServer(cfg config.Server) (*Server, error) {
 		quit: make(chan struct{}),
 		done: make(chan struct{}),
 
-		lgr: StdLogger,
+		tasks: map[string]Handler{},
+		lgr:   StdLogger,
 	}
 
 	return srvr, nil
