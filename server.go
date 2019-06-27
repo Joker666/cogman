@@ -15,10 +15,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-type Task interface {
-	Name() string
-}
-
 type Handler interface {
 	Do(ctx context.Context, payload []byte) error
 }
@@ -94,32 +90,29 @@ func NewServer(cfg config.Server) (*Server, error) {
 	return srvr, nil
 }
 
-func (s *Server) Register(t Task, h Handler) error {
-	name := t.Name()
-
-	s.debug("registering task " + name)
+func (s *Server) Register(taskName string, h Handler) error {
+	s.debug("registering task " + taskName)
 
 	s.tmu.Lock()
 	defer s.tmu.Unlock()
 
-	if _, ok := s.tasks[name]; ok {
-		s.error("duplicate task "+name, ErrDuplicateTaskName)
+	if _, ok := s.tasks[taskName]; ok {
+		s.error("duplicate task "+taskName, ErrDuplicateTaskName)
 		return ErrDuplicateTaskName
 	}
-	s.tasks[name] = h
+	s.tasks[taskName] = h
 
-	s.info("registered task " + name)
+	s.info("registered task " + taskName)
 
 	return nil
 }
 
-func (s *Server) GetTaskHandler(t Task) Handler {
+func (s *Server) GetTaskHandler(taskName string) Handler {
 	s.tmu.RLock()
 	defer s.tmu.RUnlock()
 
-	name := t.Name()
-	s.debug("getting task " + name)
-	return s.tasks[name]
+	s.debug("getting task " + taskName)
+	return s.tasks[taskName]
 }
 
 func (s *Server) Start() error {
