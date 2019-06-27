@@ -2,6 +2,7 @@ package cogman
 
 import (
 	"log"
+	"os"
 )
 
 type LogLevel uint8
@@ -48,4 +49,4 @@ func (l stdLogger) Log(level LogLevel, v ...interface{}) {
 	l.lgr.Println(append([]interface{}{level}, v...)...)
 }
 
-var StdLogger = stdLogger{lgr: &log.Logger{}}
+var StdLogger = stdLogger{lgr: log.New(os.Stdout, "", log.LstdFlags)}
