@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -146,12 +147,20 @@ func (s *Session) handleReconnect() error {
 	}
 }
 
+type PriorityType string
+
+var (
+	PriorityTypeHigh PriorityType = "High"
+	PriorityTypeLow  PriorityType = "Low"
+)
+
 // Task represents a task
 type Task struct {
 	Name    string
 	Payload []byte
 
-	id string
+	Priority PriorityType
+	id       string
 }
 
 // ID returns the task id
@@ -191,9 +200,11 @@ func (s *Session) SendTask(t *Task) error {
 	close := ch.NotifyClose(make(chan *amqp.Error))
 	publish := ch.NotifyPublish(make(chan amqp.Confirmation))
 
+	Queue := s.GetQueueName(t.Priority)
+
 	err = ch.Publish(
 		s.cfg.AMQP.Exchange,
-		s.cfg.AMQP.Queue,
+		Queue,
 		false,
 		false,
 		amqp.Publishing{
@@ -226,4 +237,51 @@ func (s *Session) SendTask(t *Task) error {
 	t.id = id
 
 	return nil
+}
+
+func (s *Session) GetQueueName(pType PriorityType) string {
+	name := ""
+	msgCount := 0
+	queueType := ""
+
+	if pType == PriorityTypeHigh {
+		queueType = "priority_queue"
+	} else {
+		queueType = "lazy_queue"
+	}
+
+	for i := 0; i < s.cfg.AMQP.PriorityQueueCount; i++ {
+		name := fmt.Sprintf("%s_%d", queueType, i)
+		if c, err := s.EnsureQueue(s.conn, name); err == nil {
+			if name == "" || msgCount > c.Messages {
+				name = c.Name
+				msgCount = c.Messages
+			}
+		}
+	}
+
+	return name
+}
+
+func (s *Session) EnsureQueue(con *amqp.Connection, queue string) (*amqp.Queue, error) {
+	chnl, err := con.Channel()
+	if err != nil {
+		return nil, err
+	}
+
+	defer chnl.Close()
+
+	qu, err := chnl.QueueDeclare(
+		queue,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &qu, nil
 }

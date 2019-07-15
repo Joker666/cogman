@@ -10,10 +10,11 @@ type Server struct {
 }
 
 type AMQP struct {
-	URI      string
-	Exchange string
-	Queue    string
-	Prefetch int
+	URI                string
+	Exchange           string
+	PriorityQueueCount int
+	LazyQueueCount     int
+	Prefetch           int
 }
 
 type Mongo struct {

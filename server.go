@@ -3,6 +3,7 @@ package cogman
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -146,10 +147,13 @@ func (s *Server) Start() error {
 		s.running = false
 	}()
 
-	s.debug("ensuring queue: " + s.cfg.AMQP.Queue)
-	if err := ensureQueue(s.acon, s.cfg.AMQP.Queue); err != nil {
-		s.error("failed to ensure queue: "+s.cfg.AMQP.Queue, err)
-		return err
+	s.debug("ensuring queue: ")
+	for i := 0; i < s.cfg.AMQP.PriorityQueueCount; i++ {
+		queue := fmt.Sprintf("priority_queue_%d", i)
+		if err := ensureQueue(s.acon, queue); err != nil {
+			s.error("failed to ensure queue: "+queue, err)
+			return err
+		}
 	}
 
 	ctx, stop := context.WithCancel(context.Background())
@@ -159,7 +163,7 @@ func (s *Server) Start() error {
 
 	go func() {
 		// TODO: handle error
-		s.consume(ctx, s.cfg.AMQP.Queue, s.cfg.AMQP.Prefetch)
+		s.consume(ctx, s.cfg.AMQP.Prefetch)
 		wg.Done()
 	}()
 
@@ -278,7 +282,9 @@ func (s *Server) Stop() error {
 	return nil
 }
 
-func (s *Server) consume(ctx context.Context, queue string, prefetch int) error {
+func (s *Server) consume(ctx context.Context, prefetch int) error {
+	defer ctx.Done()
+
 	errCh := make(chan error)
 
 	s.debug("creating channel")
@@ -297,22 +303,40 @@ func (s *Server) consume(ctx context.Context, queue string, prefetch int) error 
 		return err
 	}
 
-	s.debug("creating consumer", object{"queue", queue})
-	msgs, err := chnl.Consume(
-		queue,
-		"",
-		false,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		s.error("failed to create consumer", err)
-		return err
-	}
+	task := make(chan amqp.Delivery)
 
-	// TODO: Handle error channel
+	s.debug("creating consumer")
+
+	for i := 0; i < s.cfg.AMQP.PriorityQueueCount; i++ {
+		queue := fmt.Sprintf("priority_queue_%d", i)
+
+		go func() {
+			msgs, err := chnl.Consume(
+				queue,
+				"",
+				false,
+				false,
+				false,
+				false,
+				nil,
+			)
+			if err != nil {
+				s.error("failed to create consumer", err)
+				return
+			}
+
+			for {
+				select {
+				case <-ctx.Done():
+					s.debug("queue closing", object{"queue", queue})
+					break
+				case task <- (<-msgs):
+					s.debug("got new task from", object{"queue", queue})
+				}
+			}
+
+		}()
+	}
 
 	wg := sync.WaitGroup{}
 
@@ -320,15 +344,16 @@ func (s *Server) consume(ctx context.Context, queue string, prefetch int) error 
 		var msg amqp.Delivery
 
 		done := false
+
 		select {
+		case msg = <-task:
+			s.debug("received a task to process")
 		case <-ctx.Done():
-			s.debug("got done signal")
+			s.debug("task processing stoped")
 			done = true
 		case err = <-errCh:
 			s.debug("got error in channel")
 			done = true
-		case msg = <-msgs:
-			s.debug("got new task")
 		}
 
 		if done {
