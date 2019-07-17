@@ -249,7 +249,6 @@ func (s *Session) GetQueueName(pType util.PriorityType) string {
 
 	for {
 		// TODO: Handle low priority queue
-
 		queue := fmt.Sprintf("%s_%d", queueType, s.getQueueIndex())
 		if _, err := s.EnsureQueue(s.conn, queue); err == nil {
 			name = queue

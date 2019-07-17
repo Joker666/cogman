@@ -149,7 +149,6 @@ func (s *Server) Start() error {
 	}()
 
 	// TODO: Handle low priority queue
-
 	s.debug("ensuring queue: ")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
 		queue := fmt.Sprintf("%s_%d", util.HighPriorityQueue, i)
@@ -308,9 +307,8 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 
 	taskPool := make(chan amqp.Delivery)
 
-	s.debug("creating consumer")
-
 	// TODO: Handle low priority queue
+	s.debug("creating consumer")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
 		queue := fmt.Sprintf("%s_%d", util.HighPriorityQueue, i)
 
@@ -325,6 +323,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 				nil,
 			)
 			if err != nil {
+				errCh <- err
 				s.error("failed to create consumer", err)
 				return
 			}
@@ -353,11 +352,11 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		case msg = <-taskPool:
 			s.debug("received a task to process", object{"msgID", msg.MessageId})
 		case <-ctx.Done():
-			s.debug("task processing stoped")
+			s.debug("task processing stopped")
 			done = true
-		case err = <-errCh:
-			s.debug("got error in channel")
-			done = true
+		case err := <-errCh:
+			s.error("got error in channel: ", err)
+			continue
 		}
 
 		if done {
