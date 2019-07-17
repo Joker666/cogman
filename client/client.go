@@ -2,12 +2,13 @@ package client
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/Tapfury/cogman/config"
+	"github.com/Tapfury/cogman/util"
+
 	"github.com/google/uuid"
 	"github.com/streadway/amqp"
 )
@@ -150,19 +151,12 @@ func (s *Session) handleReconnect() error {
 	}
 }
 
-type PriorityType string
-
-var (
-	PriorityTypeHigh PriorityType = "High"
-	PriorityTypeLow  PriorityType = "Low"
-)
-
 // Task represents a task
 type Task struct {
 	Name    string
 	Payload []byte
 
-	Priority PriorityType
+	Priority util.PriorityType
 	id       string
 }
 
@@ -171,15 +165,6 @@ func (t *Task) ID() string {
 	return t.id
 }
 
-// List of available errors
-var (
-	ErrNotConnected      = errors.New("cogman: client not connected")
-	ErrNotPublished      = errors.New("cogman: task not published")
-	ErrInvalidConfig     = errors.New("cogman: invalid client config")
-	ErrRequestTimeout    = errors.New("cogman: request timeout")
-	ErrConnectionTimeout = errors.New("cogman: connection timeout")
-)
-
 // SendTask sends task t
 func (s *Session) SendTask(t *Task) error {
 	s.mu.RLock()
@@ -187,6 +172,10 @@ func (s *Session) SendTask(t *Task) error {
 		return ErrNotConnected
 	}
 	s.mu.RUnlock()
+
+	if !t.Priority.Valid() {
+		return ErrInvalidPriority
+	}
 
 	ch, err := s.conn.Channel()
 	if err != nil {
@@ -250,16 +239,17 @@ func (s *Session) SendTask(t *Task) error {
 	return nil
 }
 
-func (s *Session) GetQueueName(pType PriorityType) string {
-	queueType := ""
+func (s *Session) GetQueueName(pType util.PriorityType) string {
+	queueType := util.LowPriorityQueue
 	name := ""
 
-	if pType == PriorityTypeHigh {
-		queueType = "priority_queue"
-	} else {
-		queueType = "lazy_queue"
+	if pType == util.PriorityTypeHigh {
+		queueType = util.HighPriorityQueue
 	}
+
 	for {
+		// TODO: Handle low priority queue
+
 		queue := fmt.Sprintf("%s_%d", queueType, s.getQueueIndex())
 		if _, err := s.EnsureQueue(s.conn, queue); err == nil {
 			name = queue
@@ -276,7 +266,7 @@ func (s *Session) getQueueIndex() int {
 
 	index := s.queueIndex
 	s.queueIndex++
-	s.queueIndex = s.queueIndex % s.cfg.AMQP.PriorityQueueCount
+	s.queueIndex = s.queueIndex % s.cfg.AMQP.HighPriorityQueueCount
 
 	return index
 }
