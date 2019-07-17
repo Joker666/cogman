@@ -23,6 +23,8 @@ type Session struct {
 
 	done   chan struct{}
 	reconn chan *amqp.Error
+
+	queueIndex int
 }
 
 // NewSession creates new client session with config cfg
@@ -31,7 +33,8 @@ func NewSession(cfg config.Client) (*Session, error) {
 		return nil, ErrInvalidConfig
 	}
 	return &Session{
-		cfg: &cfg,
+		cfg:        &cfg,
+		queueIndex: 0,
 	}, nil
 }
 
@@ -201,22 +204,28 @@ func (s *Session) SendTask(t *Task) error {
 	publish := ch.NotifyPublish(make(chan amqp.Confirmation))
 
 	Queue := s.GetQueueName(t.Priority)
+	errs := make(chan error)
 
-	err = ch.Publish(
-		s.cfg.AMQP.Exchange,
-		Queue,
-		false,
-		false,
-		amqp.Publishing{
-			Type:         t.Name,
-			MessageId:    id,
-			DeliveryMode: amqp.Persistent,
-			Body:         t.Payload,
-		},
-	)
-	if err != nil {
-		return err
-	}
+	go func() {
+		err := ch.Publish(
+			s.cfg.AMQP.Exchange,
+			Queue,
+			false,
+			false,
+			amqp.Publishing{
+				Headers: map[string]interface{}{
+					"TaskName": t.Name,
+				},
+				Type:         t.Name,
+				MessageId:    id,
+				DeliveryMode: amqp.Persistent,
+				Body:         t.Payload,
+			},
+		)
+		if err != nil {
+			errs <- err
+		}
+	}()
 
 	done := (<-chan time.Time)(make(chan time.Time))
 	if s.cfg.RequestTimeout != 0 {
@@ -225,6 +234,8 @@ func (s *Session) SendTask(t *Task) error {
 
 	select {
 	case err := <-close:
+		return err
+	case err := <-errs:
 		return err
 	case p := <-publish:
 		if !p.Ack {
@@ -240,27 +251,34 @@ func (s *Session) SendTask(t *Task) error {
 }
 
 func (s *Session) GetQueueName(pType PriorityType) string {
-	name := ""
-	msgCount := 0
 	queueType := ""
+	name := ""
 
 	if pType == PriorityTypeHigh {
 		queueType = "priority_queue"
 	} else {
 		queueType = "lazy_queue"
 	}
-
-	for i := 0; i < s.cfg.AMQP.PriorityQueueCount; i++ {
-		name := fmt.Sprintf("%s_%d", queueType, i)
-		if c, err := s.EnsureQueue(s.conn, name); err == nil {
-			if name == "" || msgCount > c.Messages {
-				name = c.Name
-				msgCount = c.Messages
-			}
+	for {
+		queue := fmt.Sprintf("%s_%d", queueType, s.getQueueIndex())
+		if _, err := s.EnsureQueue(s.conn, queue); err == nil {
+			name = queue
+			break
 		}
 	}
 
 	return name
+}
+
+func (s *Session) getQueueIndex() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	index := s.queueIndex
+	s.queueIndex++
+	s.queueIndex = s.queueIndex % s.cfg.AMQP.PriorityQueueCount
+
+	return index
 }
 
 func (s *Session) EnsureQueue(con *amqp.Connection, queue string) (*amqp.Queue, error) {

@@ -303,7 +303,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		return err
 	}
 
-	task := make(chan amqp.Delivery)
+	taskPool := make(chan amqp.Delivery)
 
 	s.debug("creating consumer")
 
@@ -311,10 +311,10 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		queue := fmt.Sprintf("priority_queue_%d", i)
 
 		go func() {
-			msgs, err := chnl.Consume(
+			msg, err := chnl.Consume(
 				queue,
 				"",
-				false,
+				true,
 				false,
 				false,
 				false,
@@ -330,7 +330,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 				case <-ctx.Done():
 					s.debug("queue closing", object{"queue", queue})
 					break
-				case task <- (<-msgs):
+				case taskPool <- (<-msg):
 					s.debug("got new task from", object{"queue", queue})
 				}
 			}
@@ -346,8 +346,8 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		done := false
 
 		select {
-		case msg = <-task:
-			s.debug("received a task to process")
+		case msg = <-taskPool:
+			s.debug("received a task to process", object{"msgID", msg.MessageId})
 		case <-ctx.Done():
 			s.debug("task processing stoped")
 			done = true
@@ -360,12 +360,13 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			break
 		}
 
+		// TODO: retry task if fail. value will be send by header
+
 		hdr := msg.Headers
 		if hdr == nil {
 			s.warn("skipping headless task")
 			if err := msg.Ack(false); err != nil {
 				s.error("failed to ack", err)
-				errCh <- err
 			}
 			continue
 		}
@@ -375,7 +376,6 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			s.warn("skipping unidentified task")
 			if err := msg.Ack(false); err != nil {
 				s.error("failed to ack", err)
-				errCh <- err
 			}
 			continue
 		}
@@ -383,10 +383,6 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		wrkr, ok := s.workers[taskName]
 		if !ok {
 			s.warn("skipping unhandled task", object{"task", taskName})
-			if err := msg.Ack(false); err != nil {
-				s.error("failed to ack", err)
-				errCh <- err
-			}
 			continue
 		}
 
@@ -397,7 +393,6 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 				s.error("task failed", err)
 				if err := msg.Nack(false, true); err != nil {
 					s.error("failed to nack", err)
-					errCh <- err
 				}
 			}
 			wg.Done()
