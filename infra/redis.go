@@ -86,7 +86,7 @@ func (s *RedisClient) CreateTask(t *util.Task) error {
 	return err
 }
 
-func (s *RedisClient) UpdateTaskStatus(id string, status util.Status, err error) error {
+func (s *RedisClient) UpdateTaskStatus(id string, status util.Status, failErr error) error {
 	conn := s.rcon.Get()
 	if conn == nil {
 		return ErrNotConnected
@@ -98,15 +98,19 @@ func (s *RedisClient) UpdateTaskStatus(id string, status util.Status, err error)
 		return err
 	}
 
+	if t.Status == util.StatusSuccess {
+		return nil
+	}
+
+	// A failed task won't be overwrite by any new error message
+	if status == util.StatusFailed &&
+		t.FailError != "" {
+		return nil
+	}
+
 	t.Status = status
 	t.UpdatedAt = time.Now()
-	if status == util.StatusFailed && status != util.StatusSuccess {
-		if t.FailError != nil {
-			return nil
-		}
-
-		t.FailError = err
-	}
+	t.FailError = failErr.Error()
 
 	byts, err := json.Marshal(t)
 	if err != nil {
