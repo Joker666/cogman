@@ -3,7 +3,6 @@ package cogman
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/Tapfury/cogman/config"
@@ -272,10 +271,16 @@ func (s *Server) Stop() error {
 	return nil
 }
 
+type errorTaskBody struct {
+	id     string
+	status util.Status
+	err    error
+}
+
 func (s *Server) consume(ctx context.Context, prefetch int) error {
 	defer ctx.Done()
 
-	errCh := make(chan error)
+	errCh := make(chan errorTaskBody)
 
 	s.debug("creating channel")
 
@@ -311,7 +316,6 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 				nil,
 			)
 			if err != nil {
-				errCh <- err
 				s.error("failed to create consumer", err)
 				return
 			}
@@ -343,7 +347,8 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			s.debug("task processing stopped")
 			done = true
 		case err := <-errCh:
-			s.error("got error in channel: ", err)
+			s.error("got error in task: ", err.err, object{"ID", err.id})
+			s.rcon.UpdateTaskStatus(err.id, err.status, err.err)
 			continue
 		}
 
@@ -369,15 +374,21 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 
 		taskName, ok := hdr["TaskName"].(string)
 		if !ok {
-			s.warn("skipping unidentified task")
-			s.rcon.UpdateTaskStatus(taskID, util.StatusFailed, ErrTaskUnidentified)
+			errCh <- errorTaskBody{
+				taskID,
+				util.StatusFailed,
+				ErrTaskUnidentified,
+			}
 			continue
 		}
-		log.Print(taskID, " ", taskName)
+
 		wrkr, ok := s.workers[taskName]
 		if !ok {
-			s.warn("skipping unhandled task", object{"task", taskName})
-			s.rcon.UpdateTaskStatus(taskID, util.StatusFailed, ErrTaskUnhandled)
+			errCh <- errorTaskBody{
+				taskID,
+				util.StatusFailed,
+				ErrTaskUnhandled,
+			}
 			continue
 		}
 
@@ -385,10 +396,13 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		go func(wrkr *worker, msg *amqp.Delivery) {
 			defer wg.Done()
 
-			s.info("processing task", object{"task", wrkr.taskName})
+			s.info("processing task", object{"taskName", wrkr.taskName}, object{"taskID", taskID})
 			if err := wrkr.process(msg); err != nil {
-				s.error("task failed", err)
-				s.rcon.UpdateTaskStatus(taskID, util.StatusFailed, err)
+				errCh <- errorTaskBody{
+					taskID,
+					util.StatusFailed,
+					err,
+				}
 				return
 			}
 
