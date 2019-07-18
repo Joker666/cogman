@@ -2,7 +2,7 @@ package cogman
 
 import (
 	"context"
-	"fmt"
+	"strconv"
 	"sync"
 
 	"github.com/Tapfury/cogman/config"
@@ -149,7 +149,7 @@ func (s *Server) Start() error {
 	// TODO: Handle low priority queue
 	s.debug("ensuring queue: ")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
-		queue := fmt.Sprintf("%s_%d", util.HighPriorityQueue, i)
+		queue := getQueueName(util.HighPriorityQueue, i)
 		if err := ensureQueue(s.acon, queue); err != nil {
 			s.error("failed to ensure queue: "+queue, err)
 			return err
@@ -303,7 +303,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 	// TODO: Handle low priority queue
 	s.debug("creating consumer")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
-		queue := fmt.Sprintf("%s_%d", util.HighPriorityQueue, i)
+		queue := getQueueName(util.HighPriorityQueue, i)
 
 		go func() {
 			msg, err := chnl.Consume(
@@ -414,4 +414,8 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 	wg.Wait()
 
 	return err
+}
+
+func getQueueName(prefix string, id int) string {
+	return prefix + "_" + strconv.Itoa(id)
 }
