@@ -100,7 +100,7 @@ func (s *RedisClient) UpdateTaskStatus(id string, status util.Status, err error)
 
 	t.Status = status
 	t.UpdatedAt = time.Now()
-	if status == util.StatusFailed {
+	if status == util.StatusFailed && status != util.StatusSuccess {
 		if t.FailError != nil {
 			return nil
 		}

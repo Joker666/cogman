@@ -207,7 +207,6 @@ func (s *Session) SendTask(t *util.Task) error {
 		)
 		if err != nil {
 			errs <- err
-			s.redisConn.UpdateTaskStatus(t.ID, util.StatusFailed, err)
 			return
 		}
 
@@ -221,14 +220,18 @@ func (s *Session) SendTask(t *util.Task) error {
 
 	select {
 	case err := <-close:
+		s.redisConn.UpdateTaskStatus(t.ID, util.StatusFailed, err)
 		return err
 	case err := <-errs:
+		s.redisConn.UpdateTaskStatus(t.ID, util.StatusFailed, err)
 		return err
 	case p := <-publish:
 		if !p.Ack {
+			s.redisConn.UpdateTaskStatus(t.ID, util.StatusFailed, ErrNotPublished)
 			return ErrNotPublished
 		}
 	case <-done:
+		s.redisConn.UpdateTaskStatus(t.ID, util.StatusFailed, ErrRequestTimeout)
 		return ErrRequestTimeout
 	}
 
