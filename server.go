@@ -2,15 +2,14 @@ package cogman
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"log"
 	"sync"
-	"time"
 
 	"github.com/Tapfury/cogman/config"
+	"github.com/Tapfury/cogman/infra"
 	"github.com/Tapfury/cogman/util"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/streadway/amqp"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -30,7 +29,7 @@ type Server struct {
 
 	cfg  *config.Server
 	mcon *mongo.Client
-	rcon *redis.Pool
+	rcon *infra.RedisClient
 	acon *amqp.Connection
 
 	workers map[string]*worker
@@ -241,25 +240,14 @@ func (s *Server) bootstrap() error {
 		return err
 	}
 
-	rpol := &redis.Pool{
-		MaxIdle:     5,
-		IdleTimeout: 300 * time.Second,
-		Dial: func() (redis.Conn, error) {
-			return redis.DialURL(s.cfg.Redis.URI)
-		},
-	}
-
-	rcon := rpol.Get()
-	defer rcon.Close()
-
+	rcon := infra.NewRedisClient(s.cfg.Redis.URI)
 	s.debug("pinging redis", object{"uri", s.cfg.Redis.URI})
-	if _, err := rcon.Do("PING"); err != nil {
+	if err := rcon.Ping(); err != nil {
 		s.error("failed redis ping", err)
-		return err
 	}
 
 	s.mcon = mcl
-	s.rcon = rpol
+	s.rcon = rcon
 	s.acon = acl
 
 	return nil
@@ -368,106 +356,48 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		hdr := msg.Headers
 		if hdr == nil {
 			s.warn("skipping headless task")
-			if err := msg.Ack(false); err != nil {
-				s.error("failed to ack", err)
-			}
 			continue
 		}
+
+		taskID, ok := hdr["TaskID"].(string)
+		if !ok {
+			s.warn("skipping unidentified task")
+			continue
+		}
+
+		s.rcon.UpdateTaskStatus(taskID, util.StatusInProgress, nil)
 
 		taskName, ok := hdr["TaskName"].(string)
 		if !ok {
 			s.warn("skipping unidentified task")
-			if err := msg.Ack(false); err != nil {
-				s.error("failed to ack", err)
-			}
+			s.rcon.UpdateTaskStatus(taskID, util.StatusFailed, ErrTaskUnidentified)
 			continue
 		}
-
+		log.Print(taskID, " ", taskName)
 		wrkr, ok := s.workers[taskName]
 		if !ok {
 			s.warn("skipping unhandled task", object{"task", taskName})
+			s.rcon.UpdateTaskStatus(taskID, util.StatusFailed, ErrTaskUnhandled)
 			continue
 		}
 
 		wg.Add(1)
 		go func(wrkr *worker, msg *amqp.Delivery) {
+			defer wg.Done()
+
 			s.info("processing task", object{"task", wrkr.taskName})
 			if err := wrkr.process(msg); err != nil {
 				s.error("task failed", err)
-				if err := msg.Nack(false, true); err != nil {
-					s.error("failed to nack", err)
-				}
+				s.rcon.UpdateTaskStatus(taskID, util.StatusFailed, err)
+				return
 			}
-			wg.Done()
+
+			s.rcon.UpdateTaskStatus(taskID, util.StatusSuccess, nil)
+
 		}(wrkr, &msg)
 	}
 
 	wg.Wait()
 
-	return err
-}
-
-type Status string
-
-const (
-	StatusQueued     Status = "queued"
-	StatusInProgress Status = "in_progress"
-	StatusFailed     Status = "failed"
-	StatusSuccess    Status = "success"
-)
-
-type task struct {
-	ID        string
-	Name      string
-	Payload   []byte
-	Status    Status
-	Failure   int
-	CreatedAt time.Time
-	UpdatedAt time.Time
-}
-
-func (s *Server) getTask(id string) (*task, error) {
-	conn := s.rcon.Get()
-	defer conn.Close()
-
-	byts, err := redis.Bytes(conn.Do("GET", id))
-	if err != nil {
-		return nil, err
-	}
-
-	t := task{}
-	if err := json.Unmarshal(byts, &t); err != nil {
-		return nil, err
-	}
-
-	return &t, nil
-}
-
-func (s *Server) updateTaskStatus(id string, status Status) error {
-	conn := s.rcon.Get()
-	defer conn.Close()
-
-	byts, err := redis.Bytes(conn.Do("GET", id))
-	if err != nil {
-		return err
-	}
-
-	t := task{}
-	if err := json.Unmarshal(byts, &t); err != nil {
-		return err
-	}
-
-	t.Status = status
-	t.UpdatedAt = time.Now()
-	if status == StatusFailed {
-		t.Failure++
-	}
-
-	byts, err = json.Marshal(t)
-	if err != nil {
-		return err
-	}
-
-	_, err = conn.Do("SET", id, byts)
 	return err
 }

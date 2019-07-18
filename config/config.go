@@ -35,4 +35,5 @@ type Client struct {
 
 	RequestTimeout time.Duration
 	AMQP           AMQP
+	Redis          Redis
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Tapfury/cogman/config"
+	"github.com/Tapfury/cogman/infra"
 	"github.com/Tapfury/cogman/util"
 
 	"github.com/google/uuid"
@@ -20,7 +21,8 @@ type Session struct {
 	mu        sync.RWMutex
 	connected bool
 
-	conn *amqp.Connection
+	conn      *amqp.Connection
+	redisConn *infra.RedisClient
 
 	done   chan struct{}
 	reconn chan *amqp.Error
@@ -35,6 +37,7 @@ func NewSession(cfg config.Client) (*Session, error) {
 	}
 	return &Session{
 		cfg:        &cfg,
+		redisConn:  infra.NewRedisClient(cfg.Redis.URI),
 		queueIndex: 0,
 	}, nil
 }
@@ -58,6 +61,10 @@ func (s *Session) Connect() error {
 
 	if s.connected {
 		return nil
+	}
+
+	if err := s.redisConn.Ping(); err != nil {
+		return err
 	}
 
 	s.done = make(chan struct{})
@@ -151,22 +158,8 @@ func (s *Session) handleReconnect() error {
 	}
 }
 
-// Task represents a task
-type Task struct {
-	Name    string
-	Payload []byte
-
-	Priority util.PriorityType
-	id       string
-}
-
-// ID returns the task id
-func (t *Task) ID() string {
-	return t.id
-}
-
 // SendTask sends task t
-func (s *Session) SendTask(t *Task) error {
+func (s *Session) SendTask(t *util.Task) error {
 	s.mu.RLock()
 	if !s.connected {
 		return ErrNotConnected
@@ -187,7 +180,7 @@ func (s *Session) SendTask(t *Task) error {
 		return err
 	}
 
-	id := uuid.New().String()
+	t.ID = uuid.New().String()
 
 	close := ch.NotifyClose(make(chan *amqp.Error))
 	publish := ch.NotifyPublish(make(chan amqp.Confirmation))
@@ -196,6 +189,7 @@ func (s *Session) SendTask(t *Task) error {
 	errs := make(chan error)
 
 	go func() {
+		s.redisConn.CreateTask(t)
 		err := ch.Publish(
 			s.cfg.AMQP.Exchange,
 			Queue,
@@ -204,16 +198,20 @@ func (s *Session) SendTask(t *Task) error {
 			amqp.Publishing{
 				Headers: map[string]interface{}{
 					"TaskName": t.Name,
+					"TaskID":   t.ID,
 				},
 				Type:         t.Name,
-				MessageId:    id,
 				DeliveryMode: amqp.Persistent,
 				Body:         t.Payload,
 			},
 		)
 		if err != nil {
 			errs <- err
+			s.redisConn.UpdateTaskStatus(t.ID, util.StatusFailed, err)
+			return
 		}
+
+		s.redisConn.UpdateTaskStatus(t.ID, util.StatusQueued, nil)
 	}()
 
 	done := (<-chan time.Time)(make(chan time.Time))
@@ -233,8 +231,6 @@ func (s *Session) SendTask(t *Task) error {
 	case <-done:
 		return ErrRequestTimeout
 	}
-
-	t.id = id
 
 	return nil
 }

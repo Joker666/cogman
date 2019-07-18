@@ -7,6 +7,10 @@ var (
 	ErrRunningServer     = errors.New("cogman: server is already running")
 	ErrStoppedServer     = errors.New("cogman: server is already stopped")
 	ErrNoTask            = errors.New("cogman: server has no task")
+	ErrTaskHeadless      = errors.New("cogman: headless task")
+	ErrTaskUnidentified  = errors.New("cogman: unidentified task")
+	ErrTaskUnhandled     = errors.New("cogman: unhandled task")
+	ErrNoTaskID          = errors.New("cogman: no task id")
 )
 
 type TaskHandlerMissingError string
