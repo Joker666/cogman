@@ -2,11 +2,14 @@ package client
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/Tapfury/cogman/config"
+	"github.com/Tapfury/cogman/infra"
+	"github.com/Tapfury/cogman/util"
+
 	"github.com/google/uuid"
 	"github.com/streadway/amqp"
 )
@@ -18,10 +21,13 @@ type Session struct {
 	mu        sync.RWMutex
 	connected bool
 
-	conn *amqp.Connection
+	conn      *amqp.Connection
+	redisConn *infra.RedisClient
 
 	done   chan struct{}
 	reconn chan *amqp.Error
+
+	queueIndex int
 }
 
 // NewSession creates new client session with config cfg
@@ -30,7 +36,9 @@ func NewSession(cfg config.Client) (*Session, error) {
 		return nil, ErrInvalidConfig
 	}
 	return &Session{
-		cfg: &cfg,
+		cfg:        &cfg,
+		redisConn:  infra.NewRedisClient(cfg.Redis.URI),
+		queueIndex: 0,
 	}, nil
 }
 
@@ -53,6 +61,10 @@ func (s *Session) Connect() error {
 
 	if s.connected {
 		return nil
+	}
+
+	if err := s.redisConn.Ping(); err != nil {
+		return err
 	}
 
 	s.done = make(chan struct{})
@@ -146,35 +158,17 @@ func (s *Session) handleReconnect() error {
 	}
 }
 
-// Task represents a task
-type Task struct {
-	Name    string
-	Payload []byte
-
-	id string
-}
-
-// ID returns the task id
-func (t *Task) ID() string {
-	return t.id
-}
-
-// List of available errors
-var (
-	ErrNotConnected      = errors.New("cogman: client not connected")
-	ErrNotPublished      = errors.New("cogman: task not published")
-	ErrInvalidConfig     = errors.New("cogman: invalid client config")
-	ErrRequestTimeout    = errors.New("cogman: request timeout")
-	ErrConnectionTimeout = errors.New("cogman: connection timeout")
-)
-
 // SendTask sends task t
-func (s *Session) SendTask(t *Task) error {
+func (s *Session) SendTask(t *util.Task) error {
 	s.mu.RLock()
 	if !s.connected {
 		return ErrNotConnected
 	}
 	s.mu.RUnlock()
+
+	if !t.Priority.Valid() {
+		return ErrInvalidPriority
+	}
 
 	ch, err := s.conn.Channel()
 	if err != nil {
@@ -186,26 +180,38 @@ func (s *Session) SendTask(t *Task) error {
 		return err
 	}
 
-	id := uuid.New().String()
+	t.ID = uuid.New().String()
 
 	close := ch.NotifyClose(make(chan *amqp.Error))
 	publish := ch.NotifyPublish(make(chan amqp.Confirmation))
 
-	err = ch.Publish(
-		s.cfg.AMQP.Exchange,
-		s.cfg.AMQP.Queue,
-		false,
-		false,
-		amqp.Publishing{
-			Type:         t.Name,
-			MessageId:    id,
-			DeliveryMode: amqp.Persistent,
-			Body:         t.Payload,
-		},
-	)
-	if err != nil {
-		return err
-	}
+	Queue := s.GetQueueName(t.Priority)
+	errs := make(chan error)
+
+	go func() {
+		s.redisConn.CreateTask(t)
+		err := ch.Publish(
+			s.cfg.AMQP.Exchange,
+			Queue,
+			false,
+			false,
+			amqp.Publishing{
+				Headers: map[string]interface{}{
+					"TaskName": t.Name,
+					"TaskID":   t.ID,
+				},
+				Type:         t.Name,
+				DeliveryMode: amqp.Persistent,
+				Body:         t.Payload,
+			},
+		)
+		if err != nil {
+			errs <- err
+			return
+		}
+
+		s.redisConn.UpdateTaskStatus(t.ID, util.StatusQueued, nil)
+	}()
 
 	done := (<-chan time.Time)(make(chan time.Time))
 	if s.cfg.RequestTimeout != 0 {
@@ -214,16 +220,74 @@ func (s *Session) SendTask(t *Task) error {
 
 	select {
 	case err := <-close:
+		s.redisConn.UpdateTaskStatus(t.ID, util.StatusFailed, err)
+		return err
+	case err := <-errs:
+		s.redisConn.UpdateTaskStatus(t.ID, util.StatusFailed, err)
 		return err
 	case p := <-publish:
 		if !p.Ack {
+			s.redisConn.UpdateTaskStatus(t.ID, util.StatusFailed, ErrNotPublished)
 			return ErrNotPublished
 		}
 	case <-done:
+		s.redisConn.UpdateTaskStatus(t.ID, util.StatusFailed, ErrRequestTimeout)
 		return ErrRequestTimeout
 	}
 
-	t.id = id
-
 	return nil
+}
+
+func (s *Session) GetQueueName(pType util.PriorityType) string {
+	queueType := util.LowPriorityQueue
+	name := ""
+
+	if pType == util.PriorityTypeHigh {
+		queueType = util.HighPriorityQueue
+	}
+
+	for {
+		// TODO: Handle low priority queue
+		queue := fmt.Sprintf("%s_%d", queueType, s.getQueueIndex())
+		if _, err := s.EnsureQueue(s.conn, queue); err == nil {
+			name = queue
+			break
+		}
+	}
+
+	return name
+}
+
+func (s *Session) getQueueIndex() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	index := s.queueIndex
+	s.queueIndex++
+	s.queueIndex = s.queueIndex % s.cfg.AMQP.HighPriorityQueueCount
+
+	return index
+}
+
+func (s *Session) EnsureQueue(con *amqp.Connection, queue string) (*amqp.Queue, error) {
+	chnl, err := con.Channel()
+	if err != nil {
+		return nil, err
+	}
+
+	defer chnl.Close()
+
+	qu, err := chnl.QueueDeclare(
+		queue,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &qu, nil
 }

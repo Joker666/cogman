@@ -10,10 +10,11 @@ type Server struct {
 }
 
 type AMQP struct {
-	URI      string
-	Exchange string
-	Queue    string
-	Prefetch int
+	URI                    string
+	Exchange               string
+	HighPriorityQueueCount int
+	LowPriorityQueueCount  int
+	Prefetch               int
 }
 
 type Mongo struct {
@@ -34,4 +35,5 @@ type Client struct {
 
 	RequestTimeout time.Duration
 	AMQP           AMQP
+	Redis          Redis
 }

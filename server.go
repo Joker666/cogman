@@ -2,13 +2,13 @@ package cogman
 
 import (
 	"context"
-	"encoding/json"
+	"strconv"
 	"sync"
-	"time"
 
 	"github.com/Tapfury/cogman/config"
+	"github.com/Tapfury/cogman/infra"
+	"github.com/Tapfury/cogman/util"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/streadway/amqp"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -28,7 +28,7 @@ type Server struct {
 
 	cfg  *config.Server
 	mcon *mongo.Client
-	rcon *redis.Pool
+	rcon *infra.RedisClient
 	acon *amqp.Connection
 
 	workers map[string]*worker
@@ -146,10 +146,14 @@ func (s *Server) Start() error {
 		s.running = false
 	}()
 
-	s.debug("ensuring queue: " + s.cfg.AMQP.Queue)
-	if err := ensureQueue(s.acon, s.cfg.AMQP.Queue); err != nil {
-		s.error("failed to ensure queue: "+s.cfg.AMQP.Queue, err)
-		return err
+	// TODO: Handle low priority queue
+	s.debug("ensuring queue: ")
+	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
+		queue := getQueueName(util.HighPriorityQueue, i)
+		if err := ensureQueue(s.acon, queue); err != nil {
+			s.error("failed to ensure queue: "+queue, err)
+			return err
+		}
 	}
 
 	ctx, stop := context.WithCancel(context.Background())
@@ -159,7 +163,7 @@ func (s *Server) Start() error {
 
 	go func() {
 		// TODO: handle error
-		s.consume(ctx, s.cfg.AMQP.Queue, s.cfg.AMQP.Prefetch)
+		s.consume(ctx, s.cfg.AMQP.Prefetch)
 		wg.Done()
 	}()
 
@@ -235,25 +239,14 @@ func (s *Server) bootstrap() error {
 		return err
 	}
 
-	rpol := &redis.Pool{
-		MaxIdle:     5,
-		IdleTimeout: 300 * time.Second,
-		Dial: func() (redis.Conn, error) {
-			return redis.DialURL(s.cfg.Redis.URI)
-		},
-	}
-
-	rcon := rpol.Get()
-	defer rcon.Close()
-
+	rcon := infra.NewRedisClient(s.cfg.Redis.URI)
 	s.debug("pinging redis", object{"uri", s.cfg.Redis.URI})
-	if _, err := rcon.Do("PING"); err != nil {
+	if err := rcon.Ping(); err != nil {
 		s.error("failed redis ping", err)
-		return err
 	}
 
 	s.mcon = mcl
-	s.rcon = rpol
+	s.rcon = rcon
 	s.acon = acl
 
 	return nil
@@ -278,8 +271,16 @@ func (s *Server) Stop() error {
 	return nil
 }
 
-func (s *Server) consume(ctx context.Context, queue string, prefetch int) error {
-	errCh := make(chan error)
+type errorTaskBody struct {
+	taskID string
+	status util.Status
+	err    error
+}
+
+func (s *Server) consume(ctx context.Context, prefetch int) error {
+	defer ctx.Done()
+
+	errCh := make(chan errorTaskBody)
 
 	s.debug("creating channel")
 
@@ -297,22 +298,40 @@ func (s *Server) consume(ctx context.Context, queue string, prefetch int) error 
 		return err
 	}
 
-	s.debug("creating consumer", object{"queue", queue})
-	msgs, err := chnl.Consume(
-		queue,
-		"",
-		false,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		s.error("failed to create consumer", err)
-		return err
-	}
+	taskPool := make(chan amqp.Delivery)
 
-	// TODO: Handle error channel
+	// TODO: Handle low priority queue
+	s.debug("creating consumer")
+	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
+		queue := getQueueName(util.HighPriorityQueue, i)
+
+		go func() {
+			msg, err := chnl.Consume(
+				queue,
+				"",
+				true,
+				false,
+				false,
+				false,
+				nil,
+			)
+			if err != nil {
+				s.error("failed to create consumer", err)
+				return
+			}
+
+			for {
+				select {
+				case <-ctx.Done():
+					s.debug("queue closing", object{"queue", queue})
+					break
+				case taskPool <- (<-msg):
+					s.debug("got new task from", object{"queue", queue})
+				}
+			}
+
+		}()
+	}
 
 	wg := sync.WaitGroup{}
 
@@ -320,62 +339,75 @@ func (s *Server) consume(ctx context.Context, queue string, prefetch int) error 
 		var msg amqp.Delivery
 
 		done := false
+
 		select {
+		case msg = <-taskPool:
+			s.debug("received a task to process", object{"msgID", msg.MessageId})
 		case <-ctx.Done():
-			s.debug("got done signal")
+			s.debug("task processing stopped")
 			done = true
-		case err = <-errCh:
-			s.debug("got error in channel")
-			done = true
-		case msg = <-msgs:
-			s.debug("got new task")
+		case err := <-errCh:
+			s.error("got error in task: ", err.err, object{"ID", err.taskID})
+			s.rcon.UpdateTaskStatus(err.taskID, err.status, err.err)
+			continue
 		}
 
 		if done {
 			break
 		}
 
+		// TODO: retry task if fail. value will be send by header
+
 		hdr := msg.Headers
 		if hdr == nil {
 			s.warn("skipping headless task")
-			if err := msg.Ack(false); err != nil {
-				s.error("failed to ack", err)
-				errCh <- err
-			}
 			continue
 		}
 
-		taskName, ok := hdr["TaskName"].(string)
+		taskID, ok := hdr["TaskID"].(string)
 		if !ok {
 			s.warn("skipping unidentified task")
-			if err := msg.Ack(false); err != nil {
-				s.error("failed to ack", err)
-				errCh <- err
+			continue
+		}
+
+		s.rcon.UpdateTaskStatus(taskID, util.StatusInProgress, nil)
+
+		taskName, ok := hdr["TaskName"].(string)
+		if !ok {
+			errCh <- errorTaskBody{
+				taskID,
+				util.StatusFailed,
+				ErrTaskUnidentified,
 			}
 			continue
 		}
 
 		wrkr, ok := s.workers[taskName]
 		if !ok {
-			s.warn("skipping unhandled task", object{"task", taskName})
-			if err := msg.Ack(false); err != nil {
-				s.error("failed to ack", err)
-				errCh <- err
+			errCh <- errorTaskBody{
+				taskID,
+				util.StatusFailed,
+				ErrTaskUnhandled,
 			}
 			continue
 		}
 
 		wg.Add(1)
 		go func(wrkr *worker, msg *amqp.Delivery) {
-			s.info("processing task", object{"task", wrkr.taskName})
+			defer wg.Done()
+
+			s.info("processing task", object{"taskName", wrkr.taskName}, object{"taskID", taskID})
 			if err := wrkr.process(msg); err != nil {
-				s.error("task failed", err)
-				if err := msg.Nack(false, true); err != nil {
-					s.error("failed to nack", err)
-					errCh <- err
+				errCh <- errorTaskBody{
+					taskID,
+					util.StatusFailed,
+					err,
 				}
+				return
 			}
-			wg.Done()
+
+			s.rcon.UpdateTaskStatus(taskID, util.StatusSuccess, nil)
+
 		}(wrkr, &msg)
 	}
 
@@ -384,67 +416,6 @@ func (s *Server) consume(ctx context.Context, queue string, prefetch int) error 
 	return err
 }
 
-type Status string
-
-const (
-	StatusQueued     Status = "queued"
-	StatusInProgress Status = "in_progress"
-	StatusFailed     Status = "failed"
-	StatusSuccess    Status = "success"
-)
-
-type task struct {
-	ID        string
-	Name      string
-	Payload   []byte
-	Status    Status
-	Failure   int
-	CreatedAt time.Time
-	UpdatedAt time.Time
-}
-
-func (s *Server) getTask(id string) (*task, error) {
-	conn := s.rcon.Get()
-	defer conn.Close()
-
-	byts, err := redis.Bytes(conn.Do("GET", id))
-	if err != nil {
-		return nil, err
-	}
-
-	t := task{}
-	if err := json.Unmarshal(byts, &t); err != nil {
-		return nil, err
-	}
-
-	return &t, nil
-}
-
-func (s *Server) updateTaskStatus(id string, status Status) error {
-	conn := s.rcon.Get()
-	defer conn.Close()
-
-	byts, err := redis.Bytes(conn.Do("GET", id))
-	if err != nil {
-		return err
-	}
-
-	t := task{}
-	if err := json.Unmarshal(byts, &t); err != nil {
-		return err
-	}
-
-	t.Status = status
-	t.UpdatedAt = time.Now()
-	if status == StatusFailed {
-		t.Failure++
-	}
-
-	byts, err = json.Marshal(t)
-	if err != nil {
-		return err
-	}
-
-	_, err = conn.Do("SET", id, byts)
-	return err
+func getQueueName(prefix string, id int) string {
+	return prefix + "_" + strconv.Itoa(id)
 }
