@@ -29,7 +29,7 @@ type Task struct {
 	Payload   []byte
 	Priority  PriorityType
 	Status    Status
-	FailError error
+	FailError string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
