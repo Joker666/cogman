@@ -272,7 +272,7 @@ func (s *Server) Stop() error {
 }
 
 type errorTaskBody struct {
-	id     string
+	taskID string
 	status util.Status
 	err    error
 }
@@ -347,8 +347,8 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			s.debug("task processing stopped")
 			done = true
 		case err := <-errCh:
-			s.error("got error in task: ", err.err, object{"ID", err.id})
-			s.rcon.UpdateTaskStatus(err.id, err.status, err.err)
+			s.error("got error in task: ", err.err, object{"ID", err.taskID})
+			s.rcon.UpdateTaskStatus(err.taskID, err.status, err.err)
 			continue
 		}
 
