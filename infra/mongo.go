@@ -20,7 +20,7 @@ const (
 
 type MongoClient struct {
 	URL string
-	Mcl *mongo.Client
+	mcl *mongo.Client
 }
 
 func NewMongoClient(url string) (*MongoClient, error) {
@@ -35,20 +35,20 @@ func NewMongoClient(url string) (*MongoClient, error) {
 
 	return &MongoClient{
 		URL: url,
-		Mcl: conn,
+		mcl: conn,
 	}, nil
 }
 
 func (s *MongoClient) Ping() error {
-	return s.Mcl.Ping(context.Background(), readpref.Primary())
+	return s.mcl.Ping(context.Background(), readpref.Primary())
 }
 
 func (s *MongoClient) Close() error {
-	return s.Mcl.Disconnect(context.Background())
+	return s.mcl.Disconnect(context.Background())
 }
 
 func (s *MongoClient) Connect() error {
-	err := s.Mcl.Connect(context.Background())
+	err := s.mcl.Connect(context.Background())
 	if err != nil {
 		return err
 	}
@@ -56,7 +56,7 @@ func (s *MongoClient) Connect() error {
 }
 
 func (s *MongoClient) getCollection() (*mongo.Collection, error) {
-	return s.Mcl.Database(database).Collection(tableTasks), nil
+	return s.mcl.Database(database).Collection(tableTasks), nil
 }
 
 type bsonTask struct {
@@ -64,6 +64,7 @@ type bsonTask struct {
 	TaskID         string             `bson:"task_id"`
 	Name           string             `bson:"name"`
 	Payload        []byte             `bson:"payload"`
+	Priority       string             `bson:"priority"`
 	Status         string             `bson:"status"`
 	PreviousTaskID string             `bson:"previous_task_id"`
 	FailError      string             `bson:"fail_error"`
@@ -73,11 +74,26 @@ type bsonTask struct {
 
 func prepareBsonTask(t *util.Task) *bsonTask {
 	return &bsonTask{
-		TaskID:  t.ID,
-		Name:    t.Name,
-		Payload: t.Payload,
+		TaskID:   t.ID,
+		Name:     t.Name,
+		Payload:  t.Payload,
+		Priority: string(t.Priority),
 		// "previous_task_id": t.PreviousTaskID
 		Status:    string(t.Status),
+		FailError: t.FailError,
+		CreatedAt: t.CreatedAt,
+		UpdatedAt: t.UpdatedAt,
+	}
+}
+
+func formTask(t *bsonTask) *util.Task {
+	return &util.Task{
+		ID:       t.TaskID,
+		Name:     t.Name,
+		Payload:  t.Payload,
+		Priority: util.PriorityType(t.Priority),
+		// "previous_task_id": t.PreviousTaskID
+		Status:    util.Status(t.Status),
 		FailError: t.FailError,
 		CreatedAt: t.CreatedAt,
 		UpdatedAt: t.UpdatedAt,
@@ -94,11 +110,11 @@ func (s *MongoClient) getTask(id string) (*bsonTask, error) {
 	}
 
 	task := &bsonTask{}
-	p := bson.M{
+	q := bson.M{
 		"task_id": id,
 	}
 
-	if err := col.FindOne(ctx, p).Decode(task); err != nil {
+	if err := col.FindOne(ctx, q).Decode(task); err != nil {
 		return nil, err
 	}
 
@@ -149,14 +165,45 @@ func (s *MongoClient) UpdateTaskStatus(id string, status util.Status, failErr er
 		task.FailError = failErr.Error()
 	}
 
-	p := bson.M{
-		"_id": task.ID,
+	q := bson.M{
+		"task_id": task.TaskID,
 	}
 
-	_, err = col.ReplaceOne(ctx, p, task)
+	_, err = col.ReplaceOne(ctx, q, task)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (s *MongoClient) ListByStatus(status util.Status, skip, limit int) ([]*util.Task, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	col, err := s.getCollection()
+	if err != nil {
+		return nil, err
+	}
+	q := bson.M{
+		"status": string(status),
+	}
+
+	task := []*util.Task{}
+
+	opt := options.Find().SetSkip(int64(skip)).SetLimit(int64(limit))
+	cursor, err := col.Find(ctx, q, opt)
+	for cursor.Next(ctx) {
+		bTask := &bsonTask{}
+		if err := cursor.Decode(bTask); err != nil {
+			return nil, err
+		}
+
+		task = append(task, formTask(bTask))
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return task, nil
 }

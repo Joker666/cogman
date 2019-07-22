@@ -56,7 +56,6 @@ func (s *Session) Close() error {
 // Connect connects a client session
 func (s *Session) Connect() error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	if s.connected {
 		return nil
@@ -96,9 +95,15 @@ func (s *Session) Connect() error {
 
 	s.connected = true
 
+	s.mu.Unlock()
+
 	go func() {
 		s.handleReconnect()
 	}()
+
+	if err := s.ReEnqueueTask(); err != nil {
+		return err
+	}
 
 	return nil
 }

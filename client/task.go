@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/Tapfury/cogman/util"
@@ -10,8 +11,41 @@ import (
 	"github.com/streadway/amqp"
 )
 
+func (s *Session) ReEnqueueTask() error {
+	limit := 20
+	skip := 0
+
+	for {
+		tasks, err := s.task.MongoConn.ListByStatus(util.StatusInitiated, skip, limit)
+		if err != nil {
+			return err
+		}
+
+		if len(tasks) == 0 {
+			break
+		}
+		log.Print("Re-Enqueuing total: ", len(tasks))
+
+		skip += limit
+
+		for _, t := range tasks {
+			log.Print(t.ID)
+			if err := s.SendTask(t); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 // SendTask sends task t
 func (s *Session) SendTask(t *util.Task) error {
+	if t.ID == "" {
+		t.ID = uuid.New().String()
+		s.task.CreateTask(t)
+	}
+
 	s.mu.RLock()
 	if !s.connected {
 		return ErrNotConnected
@@ -32,15 +66,11 @@ func (s *Session) SendTask(t *util.Task) error {
 		return err
 	}
 
-	t.ID = uuid.New().String()
-
 	close := ch.NotifyClose(make(chan *amqp.Error))
 	publish := ch.NotifyPublish(make(chan amqp.Confirmation))
 
 	Queue := s.GetQueueName(t.Priority)
 	errs := make(chan error)
-
-	s.task.CreateTask(t)
 
 	go func() {
 		err := ch.Publish(
