@@ -98,7 +98,7 @@ func (s *RedisClient) UpdateTaskStatus(id string, status util.Status, failErr er
 		return err
 	}
 
-	if !util.CheckStatusOrder(util.Status(task.Status), status) {
+	if !status.CheckStatusOrder(util.Status(task.Status)) {
 		return nil
 	}
 

@@ -34,7 +34,8 @@ type Task struct {
 	UpdatedAt time.Time
 }
 
-func CheckStatusOrder(statusA, statusB Status) bool {
+// CheckStatusOrder check if status st can be updated by status p
+func (p Status) CheckStatusOrder(st Status) bool {
 	val := map[Status]int{
 		StatusFailed:     0,
 		StatusInitiated:  0,
@@ -43,5 +44,5 @@ func CheckStatusOrder(statusA, statusB Status) bool {
 		StatusSuccess:    4,
 	}
 
-	return val[statusA] <= val[statusB]
+	return val[p] >= val[st]
 }
