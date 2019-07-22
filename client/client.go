@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"log"
 	"sync"
 	"time"
 
@@ -19,8 +20,8 @@ type Session struct {
 	mu        sync.RWMutex
 	connected bool
 
-	conn *amqp.Connection
-	task repo.Task
+	conn     *amqp.Connection
+	taskRepo repo.Task
 
 	done   chan struct{}
 	reconn chan *amqp.Error
@@ -46,7 +47,7 @@ func (s *Session) Close() error {
 	defer s.mu.Unlock()
 
 	s.connected = false
-	s.task.Close()
+	s.taskRepo.CloseClients()
 
 	close(s.done)
 
@@ -56,6 +57,7 @@ func (s *Session) Close() error {
 // Connect connects a client session
 func (s *Session) Connect() error {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	if s.connected {
 		return nil
@@ -75,8 +77,8 @@ func (s *Session) Connect() error {
 		return err
 	}
 
-	s.task.MongoConn = mcon
-	s.task.RedisConn = rcon
+	s.taskRepo.MongoConn = mcon
+	s.taskRepo.RedisConn = rcon
 
 	s.done = make(chan struct{})
 
@@ -95,15 +97,15 @@ func (s *Session) Connect() error {
 
 	s.connected = true
 
-	s.mu.Unlock()
-
 	go func() {
 		s.handleReconnect()
 	}()
 
-	if err := s.ReEnqueueTask(); err != nil {
-		return err
-	}
+	go func() {
+		if err := s.ReEnqueueUnhandledTasks(); err != nil {
+			log.Print("Error in re-enqueuing: ", err)
+		}
+	}()
 
 	return nil
 }

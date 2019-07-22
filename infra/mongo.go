@@ -153,6 +153,9 @@ func (s *MongoClient) UpdateTaskStatus(id string, status util.Status, failErr er
 	if err != nil {
 		return err
 	}
+	if task == nil {
+		return ErrTaskNotFound
+	}
 
 	if !util.CheckStatusOrder(util.Status(task.Status), status) {
 		return nil

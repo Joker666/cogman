@@ -137,7 +137,7 @@ func (s *Server) Start() error {
 
 	defer func() {
 		s.debug("closing connections")
-		s.taskRep.Close()
+		s.taskRep.CloseClients()
 		s.acon.Close()
 		s.running = false
 	}()

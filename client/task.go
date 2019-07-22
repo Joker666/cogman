@@ -11,7 +11,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func (s *Session) ReEnqueueTask() error {
+func (s *Session) ReEnqueueUnhandledTasks() error {
 	limit := 20
 	skip := 0
 
