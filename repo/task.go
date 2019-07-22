@@ -2,6 +2,7 @@ package repo
 
 import (
 	"log"
+	"time"
 
 	"github.com/Tapfury/cogman/infra"
 	"github.com/Tapfury/cogman/util"
@@ -12,7 +13,7 @@ type Task struct {
 	MongoConn *infra.MongoClient
 }
 
-func (s *Task) Close() {
+func (s *Task) CloseClients() {
 	s.RedisConn.Close()
 	s.MongoConn.Close()
 }
@@ -21,26 +22,30 @@ func (s *Task) CreateTask(task *util.Task) {
 	go func() {
 		err := s.MongoConn.CreateTask(task)
 		if err != nil {
-			log.Print("Mongo: faile to create task ", err)
+			log.Print("Mongo: failed to create task ", err)
 		}
 	}()
 
 	err := s.RedisConn.CreateTask(task)
 	if err != nil {
-		log.Print("Redis: faile to create task ", err)
+		log.Print("Redis: failed to create task ", err)
 	}
 }
 
 func (s *Task) UpdateTaskStatus(id string, status util.Status, failError error) {
 	go func() {
-		err := s.MongoConn.UpdateTaskStatus(id, status, failError)
-		if err != nil {
-			log.Print("Mongo: faile to update task: ", id, " ", err)
+		var err error
+		for i := 0; i < 3; i++ {
+			if err = s.MongoConn.UpdateTaskStatus(id, status, failError); err == nil {
+				return
+			}
+			time.Sleep(time.Second)
 		}
+		log.Print("Mongo: failed to update task: ", id, " ", status, " ", err)
 	}()
 
 	err := s.RedisConn.UpdateTaskStatus(id, status, failError)
 	if err != nil {
-		log.Print("Redis: faile to update task: ", id, " ", err)
+		log.Print("Redis: failed to update task: ", id, " ", status, " ", err)
 	}
 }

@@ -16,7 +16,7 @@ func (s *Session) ReEnqueueUnhandledTasks() error {
 	skip := 0
 
 	for {
-		tasks, err := s.task.MongoConn.ListByStatus(util.StatusInitiated, skip, limit)
+		tasks, err := s.taskRepo.MongoConn.ListByStatus(util.StatusInitiated, skip, limit)
 		if err != nil {
 			return err
 		}
@@ -29,8 +29,7 @@ func (s *Session) ReEnqueueUnhandledTasks() error {
 		skip += limit
 
 		for _, t := range tasks {
-			log.Print(t.ID)
-			if err := s.SendTask(t); err != nil {
+			if err := s.SendTask(*t); err != nil {
 				return err
 			}
 		}
@@ -40,10 +39,10 @@ func (s *Session) ReEnqueueUnhandledTasks() error {
 }
 
 // SendTask sends task t
-func (s *Session) SendTask(t *util.Task) error {
+func (s *Session) SendTask(t util.Task) error {
 	if t.ID == "" {
 		t.ID = uuid.New().String()
-		s.task.CreateTask(t)
+		s.taskRepo.CreateTask(&t)
 	}
 
 	s.mu.RLock()
@@ -94,7 +93,7 @@ func (s *Session) SendTask(t *util.Task) error {
 			return
 		}
 
-		s.task.UpdateTaskStatus(t.ID, util.StatusQueued, nil)
+		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusQueued, nil)
 	}()
 
 	done := (<-chan time.Time)(make(chan time.Time))
@@ -104,18 +103,18 @@ func (s *Session) SendTask(t *util.Task) error {
 
 	select {
 	case err := <-close:
-		s.task.UpdateTaskStatus(t.ID, util.StatusFailed, err)
+		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, err)
 		return err
 	case err := <-errs:
-		s.task.UpdateTaskStatus(t.ID, util.StatusFailed, err)
+		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, err)
 		return err
 	case p := <-publish:
 		if !p.Ack {
-			s.task.UpdateTaskStatus(t.ID, util.StatusFailed, ErrNotPublished)
+			s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, ErrNotPublished)
 			return ErrNotPublished
 		}
 	case <-done:
-		s.task.UpdateTaskStatus(t.ID, util.StatusFailed, ErrRequestTimeout)
+		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, ErrRequestTimeout)
 		return ErrRequestTimeout
 	}
 
