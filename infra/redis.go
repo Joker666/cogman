@@ -93,30 +93,27 @@ func (s *RedisClient) UpdateTaskStatus(id string, status util.Status, failErr er
 	}
 	defer conn.Close()
 
-	t, err := s.getTask(id)
+	task, err := s.getTask(id)
 	if err != nil {
 		return err
 	}
 
-	if t.Status == util.StatusSuccess {
+	if !util.CheckStatusOrder(util.Status(task.Status), status) {
 		return nil
 	}
 
-	// A failed task won't be overwrite by any new error message
-	if status == util.StatusFailed &&
-		t.FailError != "" {
-		return nil
+	task.Status = status
+	task.UpdatedAt = time.Now()
+	task.FailError = ""
+	if failErr != nil {
+		task.FailError = failErr.Error()
 	}
 
-	t.Status = status
-	t.UpdatedAt = time.Now()
-	t.FailError = failErr.Error()
-
-	byts, err := json.Marshal(t)
+	byts, err := json.Marshal(task)
 	if err != nil {
 		return err
 	}
 
-	_, err = conn.Do("SET", t.ID, byts)
+	_, err = conn.Do("SET", task.ID, byts)
 	return err
 }

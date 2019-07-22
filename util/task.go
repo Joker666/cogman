@@ -33,3 +33,15 @@ type Task struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+func CheckStatusOrder(statusA, statusB Status) bool {
+	val := map[Status]int{
+		StatusFailed:     0,
+		StatusInitiated:  0,
+		StatusQueued:     0,
+		StatusInProgress: 0,
+		StatusSuccess:    4,
+	}
+
+	return val[statusA] <= val[statusB]
+}
