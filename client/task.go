@@ -42,7 +42,9 @@ func (s *Session) ReEnqueueUnhandledTasksBefore(t time.Time) error {
 func (s *Session) SendTask(t util.Task) error {
 	if t.ID == "" {
 		t.ID = uuid.New().String()
-		s.taskRepo.CreateTask(&t)
+		if err := s.taskRepo.CreateTask(&t); err != nil {
+			return err
+		}
 	}
 
 	s.mu.RLock()
@@ -65,11 +67,11 @@ func (s *Session) SendTask(t util.Task) error {
 		return err
 	}
 
-	close := ch.NotifyClose(make(chan *amqp.Error))
-	publish := ch.NotifyPublish(make(chan amqp.Confirmation))
+	close := ch.NotifyClose(make(chan *amqp.Error, 1))
+	publish := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
+	errs := make(chan error, 1)
 
 	Queue := s.GetQueueName(t.Priority)
-	errs := make(chan error)
 
 	go func() {
 		err := ch.Publish(
@@ -96,7 +98,7 @@ func (s *Session) SendTask(t util.Task) error {
 		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusQueued, nil)
 	}()
 
-	done := (<-chan time.Time)(make(chan time.Time))
+	done := (<-chan time.Time)(make(chan time.Time, 1))
 	if s.cfg.RequestTimeout != 0 {
 		done = time.After(s.cfg.RequestTimeout)
 	}
@@ -110,9 +112,11 @@ func (s *Session) SendTask(t util.Task) error {
 		return err
 	case p := <-publish:
 		if !p.Ack {
+			log.Print("Task acknowledgement failed. ID:", t.ID)
 			s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, ErrNotPublished)
 			return ErrNotPublished
 		}
+		log.Print("Task acknowledged. ID:", t.ID)
 	case <-done:
 		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, ErrRequestTimeout)
 		return ErrRequestTimeout
