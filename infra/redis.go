@@ -1,10 +1,8 @@
 package infra
 
 import (
-	"encoding/json"
 	"time"
 
-	"github.com/Tapfury/cogman/util"
 	"github.com/gomodule/redigo/redis"
 )
 
@@ -44,76 +42,34 @@ func (s *RedisClient) Close() error {
 	return s.rcon.Close()
 }
 
-func (s *RedisClient) getTask(id string) (*util.Task, error) {
+func (s *RedisClient) Get(key string) ([]byte, error) {
 	conn := s.rcon.Get()
 	if conn == nil {
 		return nil, ErrNotConnected
 	}
 	defer conn.Close()
 
-	byts, err := redis.Bytes(conn.Do("GET", id))
-	if err != nil {
-		return nil, err
-	}
-
-	t := util.Task{}
-	if err := json.Unmarshal(byts, &t); err != nil {
-		return nil, err
-	}
-
-	return &t, nil
+	return redis.Bytes(conn.Do("GET", key))
 }
 
-func (s *RedisClient) CreateTask(t *util.Task) error {
+func (s *RedisClient) Create(key string, t []byte) error {
 	conn := s.rcon.Get()
 	if conn == nil {
 		return ErrNotConnected
 	}
 	defer conn.Close()
 
-	nw := time.Now()
-
-	t.Status = util.StatusInitiated
-	t.UpdatedAt = nw
-	t.CreatedAt = nw
-
-	byts, err := json.Marshal(t)
-	if err != nil {
-		return err
-	}
-
-	_, err = conn.Do("SET", t.ID, byts)
+	_, err := conn.Do("SET", key, t)
 	return err
 }
 
-func (s *RedisClient) UpdateTaskStatus(id string, status util.Status, failErr error) error {
+func (s *RedisClient) Update(key string, t []byte) error {
 	conn := s.rcon.Get()
 	if conn == nil {
 		return ErrNotConnected
 	}
 	defer conn.Close()
 
-	task, err := s.getTask(id)
-	if err != nil {
-		return err
-	}
-
-	if !status.CheckStatusOrder(util.Status(task.Status)) {
-		return nil
-	}
-
-	task.Status = status
-	task.UpdatedAt = time.Now()
-	task.FailError = ""
-	if failErr != nil {
-		task.FailError = failErr.Error()
-	}
-
-	byts, err := json.Marshal(task)
-	if err != nil {
-		return err
-	}
-
-	_, err = conn.Do("SET", task.ID, byts)
+	_, err := conn.Do("SET", key, t)
 	return err
 }

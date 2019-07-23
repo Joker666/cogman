@@ -16,7 +16,7 @@ func (s *Session) ReEnqueueUnhandledTasks() error {
 	skip := 0
 
 	for {
-		tasks, err := s.taskRepo.MongoConn.ListByStatus(util.StatusInitiated, skip, limit)
+		tasks, err := s.taskRepo.ListByStatus(util.StatusInitiated, skip, limit)
 		if err != nil {
 			return err
 		}

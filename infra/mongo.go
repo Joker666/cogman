@@ -2,12 +2,8 @@ package infra
 
 import (
 	"context"
-	"time"
-
-	"github.com/Tapfury/cogman/util"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -59,48 +55,7 @@ func (s *MongoClient) getCollection() (*mongo.Collection, error) {
 	return s.mcl.Database(database).Collection(tableTasks), nil
 }
 
-type bsonTask struct {
-	ID             primitive.ObjectID `bson:"_id"`
-	TaskID         string             `bson:"task_id"`
-	Name           string             `bson:"name"`
-	Payload        []byte             `bson:"payload"`
-	Priority       string             `bson:"priority"`
-	Status         string             `bson:"status"`
-	PreviousTaskID string             `bson:"previous_task_id"`
-	FailError      string             `bson:"fail_error"`
-	CreatedAt      time.Time          `bson:"created_at"`
-	UpdatedAt      time.Time          `bson:"updated_at"`
-}
-
-func prepareBsonTask(t *util.Task) *bsonTask {
-	return &bsonTask{
-		TaskID:   t.ID,
-		Name:     t.Name,
-		Payload:  t.Payload,
-		Priority: string(t.Priority),
-		// "previous_task_id": t.PreviousTaskID
-		Status:    string(t.Status),
-		FailError: t.FailError,
-		CreatedAt: t.CreatedAt,
-		UpdatedAt: t.UpdatedAt,
-	}
-}
-
-func formTask(t *bsonTask) *util.Task {
-	return &util.Task{
-		ID:       t.TaskID,
-		Name:     t.Name,
-		Payload:  t.Payload,
-		Priority: util.PriorityType(t.Priority),
-		// "previous_task_id": t.PreviousTaskID
-		Status:    util.Status(t.Status),
-		FailError: t.FailError,
-		CreatedAt: t.CreatedAt,
-		UpdatedAt: t.UpdatedAt,
-	}
-}
-
-func (s *MongoClient) getTask(id string) (*bsonTask, error) {
+func (s *MongoClient) Get(q bson.M) (*mongo.SingleResult, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -109,19 +64,15 @@ func (s *MongoClient) getTask(id string) (*bsonTask, error) {
 		return nil, err
 	}
 
-	task := &bsonTask{}
-	q := bson.M{
-		"task_id": id,
+	resp := col.FindOne(ctx, q)
+	if resp.Err() != nil {
+		return nil, resp.Err()
 	}
 
-	if err := col.FindOne(ctx, q).Decode(task); err != nil {
-		return nil, err
-	}
-
-	return task, nil
+	return resp, nil
 }
 
-func (s *MongoClient) CreateTask(t *util.Task) error {
+func (s *MongoClient) Create(t interface{}) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -130,17 +81,11 @@ func (s *MongoClient) CreateTask(t *util.Task) error {
 		return err
 	}
 
-	task := prepareBsonTask(t)
-
-	if task.ID.IsZero() {
-		task.ID = primitive.NewObjectID()
-	}
-
-	_, err = col.InsertOne(ctx, task)
+	_, err = col.InsertOne(ctx, t)
 	return err
 }
 
-func (s *MongoClient) UpdateTaskStatus(id string, status util.Status, failErr error) error {
+func (s *MongoClient) Update(q, val interface{}) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -149,30 +94,7 @@ func (s *MongoClient) UpdateTaskStatus(id string, status util.Status, failErr er
 		return err
 	}
 
-	task, err := s.getTask(id)
-	if err != nil {
-		return err
-	}
-	if task == nil {
-		return ErrTaskNotFound
-	}
-
-	if !status.CheckStatusOrder(util.Status(task.Status)) {
-		return nil
-	}
-
-	task.Status = string(status)
-	task.UpdatedAt = time.Now()
-	task.FailError = ""
-	if failErr != nil {
-		task.FailError = failErr.Error()
-	}
-
-	q := bson.M{
-		"task_id": task.TaskID,
-	}
-
-	_, err = col.ReplaceOne(ctx, q, task)
+	_, err = col.ReplaceOne(ctx, q, val)
 	if err != nil {
 		return err
 	}
@@ -180,7 +102,7 @@ func (s *MongoClient) UpdateTaskStatus(id string, status util.Status, failErr er
 	return nil
 }
 
-func (s *MongoClient) ListByStatus(status util.Status, skip, limit int) ([]*util.Task, error) {
+func (s *MongoClient) List(q interface{}, skip, limit int) (*mongo.Cursor, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -188,25 +110,15 @@ func (s *MongoClient) ListByStatus(status util.Status, skip, limit int) ([]*util
 	if err != nil {
 		return nil, err
 	}
-	q := bson.M{
-		"status": string(status),
-	}
-
-	task := []*util.Task{}
 
 	opt := options.Find().SetSkip(int64(skip)).SetLimit(int64(limit))
 	cursor, err := col.Find(ctx, q, opt)
-	for cursor.Next(ctx) {
-		bTask := &bsonTask{}
-		if err := cursor.Decode(bTask); err != nil {
-			return nil, err
-		}
-
-		task = append(task, formTask(bTask))
-	}
 	if err != nil {
 		return nil, err
 	}
+	if cursor.Err() != nil {
+		return nil, cursor.Err()
+	}
 
-	return task, nil
+	return cursor, nil
 }
