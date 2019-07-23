@@ -38,33 +38,33 @@ type bsonTask struct {
 
 func prepareBsonTask(t *util.Task) *bsonTask {
 	return &bsonTask{
-		TaskID:   t.ID,
-		Name:     t.Name,
-		Payload:  t.Payload,
-		Priority: string(t.Priority),
-		// "previous_task_id": t.PreviousTaskID
-		Status:    string(t.Status),
-		FailError: t.FailError,
-		CreatedAt: t.CreatedAt,
-		UpdatedAt: t.UpdatedAt,
+		TaskID:         t.ID,
+		Name:           t.Name,
+		Payload:        t.Payload,
+		Priority:       string(t.Priority),
+		PreviousTaskID: t.PreviousTaskID,
+		Status:         string(t.Status),
+		FailError:      t.FailError,
+		CreatedAt:      t.CreatedAt,
+		UpdatedAt:      t.UpdatedAt,
 	}
 }
 
 func formTask(t *bsonTask) *util.Task {
 	return &util.Task{
-		ID:       t.TaskID,
-		Name:     t.Name,
-		Payload:  t.Payload,
-		Priority: util.PriorityType(t.Priority),
-		// "previous_task_id": t.PreviousTaskID
-		Status:    util.Status(t.Status),
-		FailError: t.FailError,
-		CreatedAt: t.CreatedAt,
-		UpdatedAt: t.UpdatedAt,
+		ID:             t.TaskID,
+		Name:           t.Name,
+		Payload:        t.Payload,
+		Priority:       util.PriorityType(t.Priority),
+		PreviousTaskID: t.PreviousTaskID,
+		Status:         util.Status(t.Status),
+		FailError:      t.FailError,
+		CreatedAt:      t.CreatedAt,
+		UpdatedAt:      t.UpdatedAt,
 	}
 }
 
-func (s *Task) CreateTask(task *util.Task) {
+func (s *Task) CreateTask(task *util.Task) error {
 	nw := time.Now()
 
 	task.Status = util.StatusInitiated
@@ -72,6 +72,10 @@ func (s *Task) CreateTask(task *util.Task) {
 	task.CreatedAt = nw
 
 	go func() {
+		if err := s.MongoConn.Ping(); err != nil {
+			return
+		}
+
 		t := prepareBsonTask(task)
 		if t.ID.IsZero() {
 			t.ID = primitive.NewObjectID()
@@ -99,13 +103,15 @@ func (s *Task) CreateTask(task *util.Task) {
 		}
 	}()
 
-	if errs != nil {
-		log.Print("Redis: failed to create task ", errs)
-	}
+	return errs
 }
 
 func (s *Task) UpdateTaskStatus(id string, status util.Status, failError error) {
 	go func() {
+		if err := s.MongoConn.Ping(); err != nil {
+			return
+		}
+
 		var errs error
 
 		q := bson.M{
