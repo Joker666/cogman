@@ -199,9 +199,12 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, failError error) 
 	}
 }
 
-func (s *Task) ListByStatus(status util.Status, skip, limit int) ([]*util.Task, error) {
+func (s *Task) ListByStatusBefore(status util.Status, t time.Time, skip, limit int) ([]*util.Task, error) {
 	q := bson.M{
 		"status": string(status),
+		"created_at": bson.M{
+			"$lte": t,
+		},
 	}
 
 	task := []*util.Task{}

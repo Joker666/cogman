@@ -11,12 +11,12 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func (s *Session) ReEnqueueUnhandledTasks() error {
+func (s *Session) ReEnqueueUnhandledTasksBefore(t time.Time) error {
 	limit := 20
 	skip := 0
 
 	for {
-		tasks, err := s.taskRepo.ListByStatus(util.StatusInitiated, skip, limit)
+		tasks, err := s.taskRepo.ListByStatusBefore(util.StatusInitiated, t, skip, limit)
 		if err != nil {
 			return err
 		}

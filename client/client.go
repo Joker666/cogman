@@ -101,8 +101,9 @@ func (s *Session) Connect() error {
 		s.handleReconnect()
 	}()
 
+	nw := time.Now()
 	go func() {
-		if err := s.ReEnqueueUnhandledTasks(); err != nil {
+		if err := s.ReEnqueueUnhandledTasksBefore(nw); err != nil {
 			log.Print("Error in re-enqueuing: ", err)
 		}
 	}()
