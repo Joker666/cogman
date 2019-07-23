@@ -7,12 +7,10 @@ import (
 
 	"github.com/Tapfury/cogman/config"
 	"github.com/Tapfury/cogman/infra"
+	"github.com/Tapfury/cogman/repo"
 	"github.com/Tapfury/cogman/util"
 
 	"github.com/streadway/amqp"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 type Handler interface {
@@ -26,10 +24,9 @@ type Server struct {
 	mu      sync.Mutex
 	running bool
 
-	cfg  *config.Server
-	mcon *mongo.Client
-	rcon *infra.RedisClient
-	acon *amqp.Connection
+	cfg     *config.Server
+	taskRep repo.Task
+	acon    *amqp.Connection
 
 	workers map[string]*worker
 
@@ -140,8 +137,7 @@ func (s *Server) Start() error {
 
 	defer func() {
 		s.debug("closing connections")
-		s.mcon.Disconnect(context.Background())
-		s.rcon.Close()
+		s.taskRep.CloseClients()
 		s.acon.Close()
 		s.running = false
 	}()
@@ -154,6 +150,8 @@ func (s *Server) Start() error {
 			s.error("failed to ensure queue: "+queue, err)
 			return err
 		}
+
+		s.debug(queue + " ensured")
 	}
 
 	ctx, stop := context.WithCancel(context.Background())
@@ -219,17 +217,19 @@ func (s *Server) bootstrap() error {
 		s.workers[t.Name] = wrkr
 	}
 
-	s.debug("connecting mongodb", object{"uri", s.cfg.Mongo.URI})
-	mcl, err := mongo.Connect(context.Background(), options.Client().ApplyURI(s.cfg.Mongo.URI))
-	if err != nil {
-		s.error("failed to connect mongodb", err)
-		return err
-	}
+	if s.cfg.Mongo.URI != "" {
+		s.debug("connecting mongodb", object{"uri", s.cfg.Mongo.URI})
+		mcl, err := infra.NewMongoClient(s.cfg.Mongo.URI)
+		if err != nil {
+			return err
+		}
 
-	s.debug("pinging mongodb")
-	if err := mcl.Ping(context.Background(), readpref.Primary()); err != nil {
-		s.error("failed mongodb ping", err)
-		return err
+		s.debug("pinging mongodb", object{"uri", s.cfg.Mongo.URI})
+		if err := mcl.Ping(); err != nil {
+			return err
+		}
+
+		s.taskRep.MongoConn = mcl
 	}
 
 	s.debug("dialing amqp", object{"uri", s.cfg.AMQP.URI})
@@ -238,16 +238,14 @@ func (s *Server) bootstrap() error {
 		s.error("failed amqp dial", err)
 		return err
 	}
+	s.acon = acl
 
 	rcon := infra.NewRedisClient(s.cfg.Redis.URI)
 	s.debug("pinging redis", object{"uri", s.cfg.Redis.URI})
 	if err := rcon.Ping(); err != nil {
 		s.error("failed redis ping", err)
 	}
-
-	s.mcon = mcl
-	s.rcon = rcon
-	s.acon = acl
+	s.taskRep.RedisConn = rcon
 
 	return nil
 }
@@ -348,7 +346,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			done = true
 		case err := <-errCh:
 			s.error("got error in task: ", err.err, object{"ID", err.taskID})
-			s.rcon.UpdateTaskStatus(err.taskID, err.status, err.err)
+			s.taskRep.UpdateTaskStatus(err.taskID, err.status, err.err)
 			continue
 		}
 
@@ -370,7 +368,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			continue
 		}
 
-		s.rcon.UpdateTaskStatus(taskID, util.StatusInProgress, nil)
+		s.taskRep.UpdateTaskStatus(taskID, util.StatusInProgress, nil)
 
 		taskName, ok := hdr["TaskName"].(string)
 		if !ok {
@@ -406,7 +404,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 				return
 			}
 
-			s.rcon.UpdateTaskStatus(taskID, util.StatusSuccess, nil)
+			s.taskRep.UpdateTaskStatus(taskID, util.StatusSuccess, nil)
 
 		}(wrkr, &msg)
 	}
