@@ -217,17 +217,19 @@ func (s *Server) bootstrap() error {
 		s.workers[t.Name] = wrkr
 	}
 
-	s.debug("connecting mongodb", object{"uri", s.cfg.Mongo.URI})
-	mcl, err := infra.NewMongoClient(s.cfg.Mongo.URI)
-	if err != nil {
-		s.error("failed to connect mongodb", err)
-		return err
-	}
+	if s.cfg.Mongo.URI != "" {
+		s.debug("connecting mongodb", object{"uri", s.cfg.Mongo.URI})
+		mcl, err := infra.NewMongoClient(s.cfg.Mongo.URI)
+		if err != nil {
+			return err
+		}
 
-	s.debug("pinging mongodb")
-	if err := mcl.Ping(); err != nil {
-		s.error("failed mongodb ping", err)
-		return err
+		s.debug("pinging mongodb", object{"uri", s.cfg.Mongo.URI})
+		if err := mcl.Ping(); err != nil {
+			return err
+		}
+
+		s.taskRep.MongoConn = mcl
 	}
 
 	s.debug("dialing amqp", object{"uri", s.cfg.AMQP.URI})
@@ -236,16 +238,14 @@ func (s *Server) bootstrap() error {
 		s.error("failed amqp dial", err)
 		return err
 	}
+	s.acon = acl
 
 	rcon := infra.NewRedisClient(s.cfg.Redis.URI)
 	s.debug("pinging redis", object{"uri", s.cfg.Redis.URI})
 	if err := rcon.Ping(); err != nil {
 		s.error("failed redis ping", err)
 	}
-
-	s.taskRep.MongoConn = mcl
 	s.taskRep.RedisConn = rcon
-	s.acon = acl
 
 	return nil
 }

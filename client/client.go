@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"log"
 	"sync"
 	"time"
 
@@ -66,18 +67,20 @@ func (s *Session) Connect() error {
 	if err := rcon.Ping(); err != nil {
 		return err
 	}
-
-	mcon, err := infra.NewMongoClient(s.cfg.Mongo.URI)
-	if err != nil {
-		return err
-	}
-
-	if err := mcon.Ping(); err != nil {
-		return err
-	}
-
-	s.taskRepo.MongoConn = mcon
 	s.taskRepo.RedisConn = rcon
+
+	if s.cfg.Mongo.URI != "" {
+		mcon, err := infra.NewMongoClient(s.cfg.Mongo.URI)
+		if err != nil {
+			return err
+		}
+
+		if err := s.taskRepo.MongoConn.Ping(); err != nil {
+			return err
+		}
+
+		s.taskRepo.MongoConn = mcon
+	}
 
 	s.done = make(chan struct{})
 
@@ -89,7 +92,7 @@ func (s *Session) Connect() error {
 		defer cancel()
 	}
 
-	err = s.connect(ctx)
+	err := s.connect(ctx)
 	if err != nil {
 		return err
 	}
@@ -100,12 +103,14 @@ func (s *Session) Connect() error {
 		s.handleReconnect()
 	}()
 
-	// nw := time.Now()
-	// go func() {
-	// 	if err := s.ReEnqueueUnhandledTasksBefore(nw); err != nil {
-	// 		log.Print("Error in re-enqueuing: ", err)
-	// 	}
-	// }()
+	if s.taskRepo.MongoConn != nil {
+		nw := time.Now()
+		go func() {
+			if err := s.ReEnqueueUnhandledTasksBefore(nw); err != nil {
+				log.Print("Error in re-enqueuing: ", err)
+			}
+		}()
+	}
 
 	return nil
 }

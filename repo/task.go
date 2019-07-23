@@ -72,7 +72,7 @@ func (s *Task) CreateTask(task *util.Task) error {
 	task.CreatedAt = nw
 
 	go func() {
-		if err := s.MongoConn.Ping(); err != nil {
+		if s.MongoConn == nil {
 			return
 		}
 
@@ -108,7 +108,7 @@ func (s *Task) CreateTask(task *util.Task) error {
 
 func (s *Task) UpdateTaskStatus(id string, status util.Status, failError error) {
 	go func() {
-		if err := s.MongoConn.Ping(); err != nil {
+		if s.MongoConn == nil {
 			return
 		}
 
