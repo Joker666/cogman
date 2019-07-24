@@ -3,7 +3,6 @@ package repo
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"time"
 
 	"github.com/Tapfury/cogman/infra"
@@ -16,6 +15,12 @@ import (
 type Task struct {
 	RedisConn *infra.RedisClient
 	MongoConn *infra.MongoClient
+
+	lgr util.Logger
+}
+
+func (s *Task) SetLogger() {
+	s.lgr = util.NewLogger()
 }
 
 func (s *Task) CloseClients() {
@@ -32,6 +37,7 @@ type bsonTask struct {
 	Status         string             `bson:"status"`
 	PreviousTaskID string             `bson:"previous_task_id"`
 	FailError      string             `bson:"fail_error"`
+	Duration       *float64           `bson:"duration"`
 	CreatedAt      time.Time          `bson:"created_at"`
 	UpdatedAt      time.Time          `bson:"updated_at"`
 }
@@ -45,6 +51,7 @@ func prepareBsonTask(t *util.Task) *bsonTask {
 		PreviousTaskID: t.PreviousTaskID,
 		Status:         string(t.Status),
 		FailError:      t.FailError,
+		Duration:       t.Duration,
 		CreatedAt:      t.CreatedAt,
 		UpdatedAt:      t.UpdatedAt,
 	}
@@ -83,7 +90,7 @@ func (s *Task) CreateTask(task *util.Task) error {
 
 		err := s.MongoConn.Create(t)
 		if err != nil {
-			log.Print("Mongo: failed to create task ", err)
+			s.lgr.Error("failed to create task", err)
 		}
 	}()
 
@@ -110,7 +117,27 @@ func nextFibonacciNumber(numberA, numberB int64) int64 {
 	return numberA + numberB
 }
 
-func (s *Task) UpdateTaskStatus(id string, status util.Status, failError error) {
+func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface{}) {
+	var failError error
+	if status == util.StatusFailed {
+		err, ok := args[0].(error)
+		if !ok {
+			s.lgr.Error("UpdateTaskStatus", ErrErrorRequired)
+			return
+		}
+		failError = err
+	}
+
+	var duration *float64
+	if status == util.StatusSuccess {
+		dur, ok := args[0].(float64)
+		if !ok {
+			s.lgr.Error("UpdateTaskStatus", ErrDurationRequired)
+			return
+		}
+		duration = &dur
+	}
+
 	go func() {
 		if s.MongoConn == nil {
 			return
@@ -153,6 +180,7 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, failError error) 
 
 				task.Status = string(status)
 				task.UpdatedAt = time.Now()
+				task.Duration = duration
 				task.FailError = ""
 				if failError != nil {
 					task.FailError = failError.Error()
@@ -167,7 +195,8 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, failError error) 
 				return
 			}
 		}
-		log.Print("Mongo: failed to update task: ", id, " ", status, " ", errs)
+
+		s.lgr.Error("failed to update task", errs, util.Object{"TaskID", id}, util.Object{"Status", status})
 	}()
 
 	var errs error
@@ -191,6 +220,7 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, failError error) 
 
 		task.Status = status
 		task.UpdatedAt = time.Now()
+		task.Duration = duration
 		task.FailError = ""
 		if failError != nil {
 			task.FailError = failError.Error()
@@ -207,7 +237,8 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, failError error) 
 	}()
 
 	if errs != nil {
-		log.Print("Redis: failed to update task: ", id, " ", status, " ", errs)
+		s.lgr.Error("failed to update task", errs, util.Object{"TaskID", id}, util.Object{"Status", status})
+
 	}
 }
 

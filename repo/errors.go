@@ -3,5 +3,7 @@ package repo
 import "errors"
 
 var (
-	ErrTaskNotFound = errors.New("mongo: task not found")
+	ErrTaskNotFound     = errors.New("mongo: task not found")
+	ErrErrorRequired    = errors.New("error message required")
+	ErrDurationRequired = errors.New("task duration required")
 )

@@ -84,6 +84,8 @@ func (s *Session) Connect() error {
 		s.taskRepo.MongoConn = mcon
 	}
 
+	s.taskRepo.SetLogger()
+
 	s.done = make(chan struct{})
 
 	ctx := context.Background()
