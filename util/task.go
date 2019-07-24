@@ -31,6 +31,7 @@ type Task struct {
 	Priority       PriorityType
 	Status         Status
 	FailError      string
+	Duration       *float64
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }

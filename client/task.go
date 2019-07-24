@@ -95,7 +95,7 @@ func (s *Session) SendTask(t util.Task) error {
 			return
 		}
 
-		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusQueued, nil)
+		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusQueued)
 	}()
 
 	done := (<-chan time.Time)(make(chan time.Time, 1))

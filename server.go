@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/Tapfury/cogman/config"
 	"github.com/Tapfury/cogman/infra"
@@ -333,7 +334,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			continue
 		}
 
-		s.taskRep.UpdateTaskStatus(taskID, util.StatusInProgress, nil)
+		s.taskRep.UpdateTaskStatus(taskID, util.StatusInProgress)
 
 		taskName, ok := hdr["TaskName"].(string)
 		if !ok {
@@ -360,6 +361,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			defer wg.Done()
 
 			s.lgr.Info("processing task", util.Object{"taskName", wrkr.taskName}, util.Object{"taskID", taskID})
+			startAt := time.Now()
 			if err := wrkr.process(msg); err != nil {
 				errCh <- errorTaskBody{
 					taskID,
@@ -368,8 +370,9 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 				}
 				return
 			}
+			duration := float64(time.Since(startAt)) / float64(time.Minute)
 
-			s.taskRep.UpdateTaskStatus(taskID, util.StatusSuccess, nil)
+			s.taskRep.UpdateTaskStatus(taskID, util.StatusSuccess, duration)
 
 		}(wrkr, &msg)
 	}
