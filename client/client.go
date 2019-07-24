@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 
@@ -78,7 +77,7 @@ func (s *Session) Connect() error {
 			return err
 		}
 
-		if err := s.taskRepo.MongoConn.Ping(); err != nil {
+		if err := mcon.Ping(); err != nil {
 			return err
 		}
 
@@ -110,7 +109,7 @@ func (s *Session) Connect() error {
 		nw := time.Now()
 		go func() {
 			if err := s.ReEnqueueUnhandledTasksBefore(nw); err != nil {
-				log.Print("Error in re-enqueuing: ", err)
+				s.lgr.Error("Error in re-enqueuing: ", err)
 			}
 		}()
 	}
