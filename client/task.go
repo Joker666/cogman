@@ -47,6 +47,7 @@ func (s *Session) SendTask(t util.Task) error {
 
 	s.mu.RLock()
 	if !s.connected {
+		s.lgr.Warn("No connection. Task enqueued.", util.Object{"TaskID", t.ID})
 		return ErrNotConnected
 	}
 	s.mu.RUnlock()

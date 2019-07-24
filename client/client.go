@@ -9,6 +9,7 @@ import (
 	"github.com/Tapfury/cogman/config"
 	"github.com/Tapfury/cogman/infra"
 	"github.com/Tapfury/cogman/repo"
+	"github.com/Tapfury/cogman/util"
 
 	"github.com/streadway/amqp"
 )
@@ -26,6 +27,7 @@ type Session struct {
 	done   chan struct{}
 	reconn chan *amqp.Error
 
+	lgr        util.Logger
 	queueIndex int
 }
 
@@ -37,6 +39,7 @@ func NewSession(cfg config.Client) (*Session, error) {
 
 	return &Session{
 		cfg:        &cfg,
+		lgr:        util.NewLogger(),
 		queueIndex: 0,
 	}, nil
 }
