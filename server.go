@@ -240,9 +240,7 @@ type errorTaskBody struct {
 }
 
 func (s *Server) consume(ctx context.Context, prefetch int) error {
-	defer ctx.Done()
-
-	errCh := make(chan errorTaskBody)
+	errCh := make(chan errorTaskBody, 1)
 
 	s.lgr.Debug("creating channel")
 
@@ -261,6 +259,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 	}
 
 	taskPool := make(chan amqp.Delivery)
+	close := chnl.NotifyClose(make(chan *amqp.Error, 1))
 
 	// TODO: Handle low priority queue
 	s.lgr.Debug("creating consumer")
@@ -286,12 +285,11 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 				select {
 				case <-ctx.Done():
 					s.lgr.Debug("queue closing", util.Object{"queue", queue})
-					break
+					return
 				case taskPool <- (<-msg):
-					s.lgr.Debug("got new task from", util.Object{"queue", queue})
+					s.lgr.Debug("new task", util.Object{"queue", queue})
 				}
 			}
-
 		}()
 	}
 
@@ -303,13 +301,16 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		done := false
 
 		select {
-		case msg = <-taskPool:
-			s.lgr.Debug("received a task to process", util.Object{"msgID", msg.MessageId})
+		case closeErr := <-close:
+			s.lgr.Error("Server closed", closeErr)
+			done = true
 		case <-ctx.Done():
 			s.lgr.Debug("task processing stopped")
 			done = true
+		case msg = <-taskPool:
+			s.lgr.Debug("received a task to process", util.Object{"msgID", msg.MessageId})
 		case err := <-errCh:
-			s.lgr.Error("got error in task: ", err.err, util.Object{"ID", err.taskID})
+			s.lgr.Error("got error in task", err.err, util.Object{"ID", err.taskID})
 			s.taskRep.UpdateTaskStatus(err.taskID, err.status, err.err)
 			continue
 		}

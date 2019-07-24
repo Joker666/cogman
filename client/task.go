@@ -116,7 +116,7 @@ func (s *Session) SendTask(t util.Task) error {
 			s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, ErrNotPublished)
 			return ErrNotPublished
 		}
-		s.lgr.Info("Task acknowledged:", util.Object{"TaskID", t.ID})
+		s.lgr.Info("Task acknowledged", util.Object{"TaskID", t.ID})
 	case <-done:
 		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, ErrRequestTimeout)
 		return ErrRequestTimeout
