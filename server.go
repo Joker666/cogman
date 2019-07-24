@@ -30,45 +30,9 @@ type Server struct {
 
 	workers map[string]*worker
 
-	lgr Logger
+	lgr util.Logger
 
 	quit, done chan struct{}
-}
-
-type object struct {
-	key string
-	val interface{}
-}
-
-type entry map[string]interface{}
-
-func prepareEntry(msg string, err error, objects ...object) entry {
-	v := map[string]interface{}{
-		"message": msg,
-	}
-	if err != nil {
-		v["error"] = err
-	}
-	for _, o := range objects {
-		v[o.key] = o.val
-	}
-	return v
-}
-
-func (s *Server) error(msg string, err error, objects ...object) {
-	s.lgr.Log(LogLevelError, prepareEntry(msg, err, objects...))
-}
-
-func (s *Server) warn(msg string, objects ...object) {
-	s.lgr.Log(LogLevelWarn, prepareEntry(msg, nil, objects...))
-}
-
-func (s *Server) info(msg string, objects ...object) {
-	s.lgr.Log(LogLevelInfo, prepareEntry(msg, nil, objects...))
-}
-
-func (s *Server) debug(msg string, objects ...object) {
-	s.lgr.Log(LogLevelDebug, prepareEntry(msg, nil, objects...))
 }
 
 func NewServer(cfg config.Server) (*Server, error) {
@@ -83,25 +47,25 @@ func NewServer(cfg config.Server) (*Server, error) {
 
 		tasks:   map[string]Handler{},
 		workers: map[string]*worker{},
-		lgr:     StdLogger,
+		lgr:     util.NewLogger(),
 	}
 
 	return srvr, nil
 }
 
 func (s *Server) Register(taskName string, h Handler) error {
-	s.debug("registering task " + taskName)
+	s.lgr.Debug("registering task " + taskName)
 
 	s.tmu.Lock()
 	defer s.tmu.Unlock()
 
 	if _, ok := s.tasks[taskName]; ok {
-		s.error("duplicate task "+taskName, ErrDuplicateTaskName)
+		s.lgr.Error("duplicate task "+taskName, ErrDuplicateTaskName)
 		return ErrDuplicateTaskName
 	}
 	s.tasks[taskName] = h
 
-	s.info("registered task " + taskName)
+	s.lgr.Info("registered task " + taskName)
 
 	return nil
 }
@@ -110,25 +74,25 @@ func (s *Server) GetTaskHandler(taskName string) Handler {
 	s.tmu.RLock()
 	defer s.tmu.RUnlock()
 
-	s.debug("getting task " + taskName)
+	s.lgr.Debug("getting task " + taskName)
 	return s.tasks[taskName]
 }
 
 func (s *Server) Start() error {
 	s.mu.Lock()
 
-	s.debug("starting server")
+	s.lgr.Debug("starting server")
 
 	if s.running {
 		s.mu.Unlock()
-		s.error("server already running", ErrRunningServer)
+		s.lgr.Error("server already running", ErrRunningServer)
 		return ErrRunningServer
 	}
 
-	s.debug("bootstraping server")
+	s.lgr.Debug("bootstraping server")
 	if err := s.bootstrap(); err != nil {
 		s.mu.Unlock()
-		s.error("failed to bootstrap", err)
+		s.lgr.Error("failed to bootstrap", err)
 		return err
 	}
 
@@ -136,22 +100,22 @@ func (s *Server) Start() error {
 	s.mu.Unlock()
 
 	defer func() {
-		s.debug("closing connections")
+		s.lgr.Debug("closing connections")
 		s.taskRep.CloseClients()
 		s.acon.Close()
 		s.running = false
 	}()
 
 	// TODO: Handle low priority queue
-	s.debug("ensuring queue: ")
+	s.lgr.Debug("ensuring queue: ")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
 		queue := getQueueName(util.HighPriorityQueue, i)
 		if err := ensureQueue(s.acon, queue); err != nil {
-			s.error("failed to ensure queue: "+queue, err)
+			s.lgr.Error("failed to ensure queue: "+queue, err)
 			return err
 		}
 
-		s.debug(queue + " ensured")
+		s.lgr.Debug(queue + " ensured")
 	}
 
 	ctx, stop := context.WithCancel(context.Background())
@@ -165,15 +129,15 @@ func (s *Server) Start() error {
 		wg.Done()
 	}()
 
-	s.info("server started")
+	s.lgr.Info("server started")
 
 	<-s.quit
 
-	s.debug("found stop signal")
+	s.lgr.Debug("found stop signal")
 
 	stop()
 
-	s.debug("waiting for completing running tasks")
+	s.lgr.Debug("waiting for completing running tasks")
 
 	wg.Wait()
 	s.done <- struct{}{}
@@ -203,7 +167,7 @@ func ensureQueue(con *amqp.Connection, queue string) error {
 }
 
 func (s *Server) bootstrap() error {
-	s.debug("initializing workers")
+	s.lgr.Debug("initializing workers")
 	for _, t := range s.cfg.Tasks {
 		h, ok := s.tasks[t.Name]
 		if !ok {
@@ -217,30 +181,30 @@ func (s *Server) bootstrap() error {
 		s.workers[t.Name] = wrkr
 	}
 
-	s.debug("connecting mongodb", object{"uri", s.cfg.Mongo.URI})
+	s.lgr.Debug("connecting mongodb", util.Object{"uri", s.cfg.Mongo.URI})
 	mcl, err := infra.NewMongoClient(s.cfg.Mongo.URI)
 	if err != nil {
-		s.error("failed to connect mongodb", err)
+		s.lgr.Error("failed to connect mongodb", err)
 		return err
 	}
 
-	s.debug("pinging mongodb")
+	s.lgr.Debug("pinging mongodb")
 	if err := mcl.Ping(); err != nil {
-		s.error("failed mongodb ping", err)
+		s.lgr.Error("failed mongodb ping", err)
 		return err
 	}
 
-	s.debug("dialing amqp", object{"uri", s.cfg.AMQP.URI})
+	s.lgr.Debug("dialing amqp", util.Object{"uri", s.cfg.AMQP.URI})
 	acl, err := amqp.Dial(s.cfg.AMQP.URI)
 	if err != nil {
-		s.error("failed amqp dial", err)
+		s.lgr.Error("failed amqp dial", err)
 		return err
 	}
 
 	rcon := infra.NewRedisClient(s.cfg.Redis.URI)
-	s.debug("pinging redis", object{"uri", s.cfg.Redis.URI})
+	s.lgr.Debug("pinging redis", util.Object{"uri", s.cfg.Redis.URI})
 	if err := rcon.Ping(); err != nil {
-		s.error("failed redis ping", err)
+		s.lgr.Error("failed redis ping", err)
 	}
 
 	s.taskRep.MongoConn = mcl
@@ -254,17 +218,17 @@ func (s *Server) Stop() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.debug("stopping server")
+	s.lgr.Debug("stopping server")
 
 	if !s.running {
-		s.error("server already stopped", ErrStoppedServer)
+		s.lgr.Error("server already stopped", ErrStoppedServer)
 		return ErrStoppedServer
 	}
 
 	s.quit <- struct{}{}
 	<-s.done
 
-	s.info("server stopped")
+	s.lgr.Info("server stopped")
 
 	return nil
 }
@@ -280,26 +244,26 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 
 	errCh := make(chan errorTaskBody)
 
-	s.debug("creating channel")
+	s.lgr.Debug("creating channel")
 
 	chnl, err := s.acon.Channel()
 	if err != nil {
-		s.error("failed to create channel", err)
+		s.lgr.Error("failed to create channel", err)
 		return err
 	}
 
 	defer chnl.Close()
 
-	s.debug("setting channel qos")
+	s.lgr.Debug("setting channel qos")
 	if err := chnl.Qos(prefetch, 0, false); err != nil {
-		s.error("failed to set qos", err)
+		s.lgr.Error("failed to set qos", err)
 		return err
 	}
 
 	taskPool := make(chan amqp.Delivery)
 
 	// TODO: Handle low priority queue
-	s.debug("creating consumer")
+	s.lgr.Debug("creating consumer")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
 		queue := getQueueName(util.HighPriorityQueue, i)
 
@@ -314,17 +278,17 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 				nil,
 			)
 			if err != nil {
-				s.error("failed to create consumer", err)
+				s.lgr.Error("failed to create consumer", err)
 				return
 			}
 
 			for {
 				select {
 				case <-ctx.Done():
-					s.debug("queue closing", object{"queue", queue})
+					s.lgr.Debug("queue closing", util.Object{"queue", queue})
 					break
 				case taskPool <- (<-msg):
-					s.debug("got new task from", object{"queue", queue})
+					s.lgr.Debug("got new task from", util.Object{"queue", queue})
 				}
 			}
 
@@ -340,12 +304,12 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 
 		select {
 		case msg = <-taskPool:
-			s.debug("received a task to process", object{"msgID", msg.MessageId})
+			s.lgr.Debug("received a task to process", util.Object{"msgID", msg.MessageId})
 		case <-ctx.Done():
-			s.debug("task processing stopped")
+			s.lgr.Debug("task processing stopped")
 			done = true
 		case err := <-errCh:
-			s.error("got error in task: ", err.err, object{"ID", err.taskID})
+			s.lgr.Error("got error in task: ", err.err, util.Object{"ID", err.taskID})
 			s.taskRep.UpdateTaskStatus(err.taskID, err.status, err.err)
 			continue
 		}
@@ -358,13 +322,13 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 
 		hdr := msg.Headers
 		if hdr == nil {
-			s.warn("skipping headless task")
+			s.lgr.Warn("skipping headless task")
 			continue
 		}
 
 		taskID, ok := hdr["TaskID"].(string)
 		if !ok {
-			s.warn("skipping unidentified task")
+			s.lgr.Warn("skipping unidentified task")
 			continue
 		}
 
@@ -394,7 +358,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		go func(wrkr *worker, msg *amqp.Delivery) {
 			defer wg.Done()
 
-			s.info("processing task", object{"taskName", wrkr.taskName}, object{"taskID", taskID})
+			s.lgr.Info("processing task", util.Object{"taskName", wrkr.taskName}, util.Object{"taskID", taskID})
 			if err := wrkr.process(msg); err != nil {
 				errCh <- errorTaskBody{
 					taskID,
