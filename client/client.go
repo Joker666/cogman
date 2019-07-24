@@ -2,13 +2,13 @@ package client
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/Tapfury/cogman/config"
 	"github.com/Tapfury/cogman/infra"
 	"github.com/Tapfury/cogman/repo"
+	"github.com/Tapfury/cogman/util"
 
 	"github.com/streadway/amqp"
 )
@@ -26,6 +26,7 @@ type Session struct {
 	done   chan struct{}
 	reconn chan *amqp.Error
 
+	lgr        util.Logger
 	queueIndex int
 }
 
@@ -37,6 +38,7 @@ func NewSession(cfg config.Client) (*Session, error) {
 
 	return &Session{
 		cfg:        &cfg,
+		lgr:        util.NewLogger(),
 		queueIndex: 0,
 	}, nil
 }
@@ -75,7 +77,7 @@ func (s *Session) Connect() error {
 			return err
 		}
 
-		if err := s.taskRepo.MongoConn.Ping(); err != nil {
+		if err := mcon.Ping(); err != nil {
 			return err
 		}
 
@@ -107,7 +109,7 @@ func (s *Session) Connect() error {
 		nw := time.Now()
 		go func() {
 			if err := s.ReEnqueueUnhandledTasksBefore(nw); err != nil {
-				log.Print("Error in re-enqueuing: ", err)
+				s.lgr.Error("Error in re-enqueuing: ", err)
 			}
 		}()
 	}

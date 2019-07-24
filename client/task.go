@@ -1,8 +1,7 @@
 package client
 
 import (
-	"fmt"
-	"log"
+	"strconv"
 	"time"
 
 	"github.com/Tapfury/cogman/util"
@@ -24,7 +23,7 @@ func (s *Session) ReEnqueueUnhandledTasksBefore(t time.Time) error {
 		if len(tasks) == 0 {
 			break
 		}
-		log.Print("Re-Enqueuing total: ", len(tasks))
+		s.lgr.Info("Re-Enqueuing", util.Object{"Total Task", len(tasks)})
 
 		skip += limit
 
@@ -49,6 +48,7 @@ func (s *Session) SendTask(t util.Task) error {
 
 	s.mu.RLock()
 	if !s.connected {
+		s.lgr.Warn("No connection. Task enqueued.", util.Object{"TaskID", t.ID})
 		return ErrNotConnected
 	}
 	s.mu.RUnlock()
@@ -112,11 +112,11 @@ func (s *Session) SendTask(t util.Task) error {
 		return err
 	case p := <-publish:
 		if !p.Ack {
-			log.Print("Task acknowledgement failed. ID:", t.ID)
+			s.lgr.Warn("Task acknowledgement failed", util.Object{"TaskID", t.ID})
 			s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, ErrNotPublished)
 			return ErrNotPublished
 		}
-		log.Print("Task acknowledged. ID:", t.ID)
+		s.lgr.Info("Task acknowledged:", util.Object{"TaskID", t.ID})
 	case <-done:
 		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, ErrRequestTimeout)
 		return ErrRequestTimeout
@@ -135,7 +135,7 @@ func (s *Session) GetQueueName(pType util.PriorityType) string {
 
 	for {
 		// TODO: Handle low priority queue
-		queue := fmt.Sprintf("%s_%d", queueType, s.getQueueIndex())
+		queue := getQueueName(queueType, s.getQueueIndex())
 		if _, err := s.EnsureQueue(s.conn, queue); err == nil {
 			name = queue
 			break
@@ -177,4 +177,8 @@ func (s *Session) EnsureQueue(con *amqp.Connection, queue string) (*amqp.Queue, 
 	}
 
 	return &qu, nil
+}
+
+func getQueueName(prefix string, id int) string {
+	return prefix + "_" + strconv.Itoa(id)
 }
