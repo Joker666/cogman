@@ -3,7 +3,6 @@ package repo
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"time"
 
 	"github.com/Tapfury/cogman/infra"
@@ -91,7 +90,7 @@ func (s *Task) CreateTask(task *util.Task) error {
 
 		err := s.MongoConn.Create(t)
 		if err != nil {
-			log.Print("Mongo: failed to create task ", err)
+			s.lgr.Error("failed to create task", err)
 		}
 	}()
 
@@ -196,7 +195,8 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 				return
 			}
 		}
-		log.Print("Mongo: failed to update task: ", id, " ", status, " ", errs)
+
+		s.lgr.Error("failed to update task", errs, util.Object{"TaskID", id}, util.Object{"Status", status})
 	}()
 
 	var errs error
@@ -237,7 +237,8 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 	}()
 
 	if errs != nil {
-		log.Print("Redis: failed to update task: ", id, " ", status, " ", errs)
+		s.lgr.Error("failed to update task", errs, util.Object{"TaskID", id}, util.Object{"Status", status})
+
 	}
 }
 
