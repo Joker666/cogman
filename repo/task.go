@@ -106,6 +106,10 @@ func (s *Task) CreateTask(task *util.Task) error {
 	return errs
 }
 
+func nextFibonacciNumber(numberA, numberB int64) int64 {
+	return numberA + numberB
+}
+
 func (s *Task) UpdateTaskStatus(id string, status util.Status, failError error) {
 	go func() {
 		if s.MongoConn == nil {
@@ -119,9 +123,13 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, failError error) 
 		}
 		task := &bsonTask{}
 
-		for i := 0; i < 3; i++ {
-			errs = nil
+		numA, numB := int64(0), int64(1)
 
+		for i := 0; i < 6; i++ {
+			time.Sleep(time.Second * time.Duration(numB))
+			numB, numA = nextFibonacciNumber(numA, numB), numB
+
+			errs = nil
 			func() {
 				resp, err := s.MongoConn.Get(q)
 				if err != nil {
@@ -158,8 +166,6 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, failError error) 
 			if errs == nil {
 				return
 			}
-
-			time.Sleep(time.Second)
 		}
 		log.Print("Mongo: failed to update task: ", id, " ", status, " ", errs)
 	}()
