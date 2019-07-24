@@ -181,17 +181,19 @@ func (s *Server) bootstrap() error {
 		s.workers[t.Name] = wrkr
 	}
 
-	s.lgr.Debug("connecting mongodb", util.Object{"uri", s.cfg.Mongo.URI})
-	mcl, err := infra.NewMongoClient(s.cfg.Mongo.URI)
-	if err != nil {
-		s.lgr.Error("failed to connect mongodb", err)
-		return err
-	}
+	if s.cfg.Mongo.URI != "" {
+		s.lgr.Debug("connecting mongodb", util.Object{"uri", s.cfg.Mongo.URI})
+		mcl, err := infra.NewMongoClient(s.cfg.Mongo.URI)
+		if err != nil {
+			return err
+		}
 
-	s.lgr.Debug("pinging mongodb")
-	if err := mcl.Ping(); err != nil {
-		s.lgr.Error("failed mongodb ping", err)
-		return err
+		s.lgr.Debug("pinging mongodb", util.Object{"uri", s.cfg.Mongo.URI})
+		if err := mcl.Ping(); err != nil {
+			return err
+		}
+
+		s.taskRep.MongoConn = mcl
 	}
 
 	s.lgr.Debug("dialing amqp", util.Object{"uri", s.cfg.AMQP.URI})
@@ -200,16 +202,14 @@ func (s *Server) bootstrap() error {
 		s.lgr.Error("failed amqp dial", err)
 		return err
 	}
+	s.acon = acl
 
 	rcon := infra.NewRedisClient(s.cfg.Redis.URI)
 	s.lgr.Debug("pinging redis", util.Object{"uri", s.cfg.Redis.URI})
 	if err := rcon.Ping(); err != nil {
 		s.lgr.Error("failed redis ping", err)
 	}
-
-	s.taskRep.MongoConn = mcl
 	s.taskRep.RedisConn = rcon
-	s.acon = acl
 
 	return nil
 }

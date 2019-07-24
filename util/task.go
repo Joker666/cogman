@@ -24,14 +24,15 @@ func (p PriorityType) Valid() bool {
 }
 
 type Task struct {
-	ID        string
-	Name      string
-	Payload   []byte
-	Priority  PriorityType
-	Status    Status
-	FailError string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID             string
+	Name           string
+	PreviousTaskID string
+	Payload        []byte
+	Priority       PriorityType
+	Status         Status
+	FailError      string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // CheckStatusOrder check if status st can be updated by status p
