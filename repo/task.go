@@ -119,17 +119,17 @@ func nextFibonacciNumber(numberA, numberB int64) int64 {
 
 func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface{}) {
 	var failError error
-	if status == util.StatusFailed {
+	var duration *float64
+
+	switch status {
+	case util.StatusFailed:
 		err, ok := args[0].(error)
 		if !ok {
 			s.lgr.Error("UpdateTaskStatus", ErrErrorRequired)
 			return
 		}
 		failError = err
-	}
-
-	var duration *float64
-	if status == util.StatusSuccess {
+	case util.StatusSuccess:
 		dur, ok := args[0].(float64)
 		if !ok {
 			s.lgr.Error("UpdateTaskStatus", ErrDurationRequired)
@@ -238,7 +238,6 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 
 	if errs != nil {
 		s.lgr.Error("failed to update task", errs, util.Object{"TaskID", id}, util.Object{"Status", status})
-
 	}
 }
 
