@@ -41,7 +41,16 @@ func (s *Session) ReEnqueueUnhandledTasksBefore(t time.Time) error {
 func (s *Session) SendTask(t util.Task) error {
 	if t.ID == "" {
 		t.ID = uuid.New().String()
-		if err := s.taskRepo.CreateTask(&t); err != nil {
+		var err error
+
+		switch t.Status {
+		case util.StatusRetry:
+			err = s.taskRepo.CreateRetryTask(t.OriginalTaskID, &t)
+		default:
+			err = s.taskRepo.CreateTask(&t)
+		}
+
+		if err != nil {
 			return err
 		}
 	}
@@ -122,7 +131,9 @@ func (s *Session) SendTask(t util.Task) error {
 
 	if errs != nil {
 		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, errs)
-		s.retryTask(t)
+		go func() {
+			s.retryTask(t)
+		}()
 	}
 
 	return errs
@@ -160,11 +171,10 @@ func (s *Session) getQueueIndex() int {
 }
 
 func (s *Session) retryTask(t util.Task) {
-	if t.Retry <= 0 {
-		return
-	}
+	t.OriginalTaskID = t.ID
+	t.ID = ""
+	t.Status = util.StatusRetry
 
-	t.Retry--
 	if err := s.SendTask(t); err != nil {
 		s.lgr.Error("failed to retry", err, util.Object{"TaskID", t.ID})
 		return
