@@ -162,11 +162,17 @@ func (s *Session) getQueueIndex() int {
 }
 
 func (s *Session) retryTask(t util.Task) {
-	t.OriginalTaskID = t.ID
-	t.ID = ""
-	t.Status = util.StatusRetry
-	t.Retry = 0
-	t.FailError = ""
+	task := util.Task{
+		ID:             "",
+		Name:           t.Name,
+		OriginalTaskID: t.ID,
+		Retry:          0,
+		Payload:        t.Payload,
+		Priority:       t.Priority,
+		Status:         util.StatusRetry,
+		FailError:      "",
+		Duration:       nil,
+	}
 
 	var err error
 	func() {
@@ -180,7 +186,7 @@ func (s *Session) retryTask(t util.Task) {
 			return
 		}
 
-		err = s.SendTask(t)
+		err = s.SendTask(task)
 	}()
 
 	if err != nil {
