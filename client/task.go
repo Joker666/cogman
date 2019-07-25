@@ -41,16 +41,7 @@ func (s *Session) ReEnqueueUnhandledTasksBefore(t time.Time) error {
 func (s *Session) SendTask(t util.Task) error {
 	if t.ID == "" {
 		t.ID = uuid.New().String()
-		var err error
-
-		switch t.Status {
-		case util.StatusRetry:
-			err = s.taskRepo.CreateRetryTask(t.OriginalTaskID, &t)
-		default:
-			err = s.taskRepo.CreateTask(&t)
-		}
-
-		if err != nil {
+		if err := s.taskRepo.CreateTask(&t); err != nil {
 			return err
 		}
 	}
@@ -174,10 +165,26 @@ func (s *Session) retryTask(t util.Task) {
 	t.OriginalTaskID = t.ID
 	t.ID = ""
 	t.Status = util.StatusRetry
+	t.Retry = 0
+	t.FailError = ""
 
-	if err := s.SendTask(t); err != nil {
+	var err error
+	func() {
+		prvTask, err := s.taskRepo.GetTask(t.OriginalTaskID)
+		if err != nil {
+			return
+		}
+
+		if prvTask.Retry == 0 {
+			err = ErrRetryLimitExceeded
+			return
+		}
+
+		err = s.SendTask(t)
+	}()
+
+	if err != nil {
 		s.lgr.Error("failed to retry", err, util.Object{"TaskID", t.ID})
-		return
 	}
 }
 

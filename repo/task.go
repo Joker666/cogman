@@ -116,71 +116,17 @@ func (s *Task) CreateTask(task *util.Task) error {
 	return errs
 }
 
-func (s *Task) CreateRetryTask(orgTaskID string, t *util.Task) error {
-	var errs error
-
-	func() {
-		byts, err := s.RedisConn.Get(orgTaskID)
-		if err != nil {
-			errs = err
-			return
-		}
-
-		task := util.Task{}
-		if err := json.Unmarshal(byts, &task); err != nil {
-			errs = err
-			return
-		}
-
-		task.Retry -= 1
-		if task.Retry < 0 {
-			err = ErrRetryLimitExceeded
-			return
-		}
-
-		nw := time.Now()
-
-		t.UpdatedAt = nw
-		t.CreatedAt = nw
-		t.Status = util.StatusInitiated
-		t.FailError = ""
-		t.OriginalTaskID = orgTaskID
-		t.Retry = 0
-
-		byts, err = json.Marshal(t)
-		if err != nil {
-			errs = err
-			return
-		}
-
-		err = s.RedisConn.Create(t.ID, byts)
-		if err != nil {
-			errs = err
-			return
-		}
-	}()
-
-	if errs != nil {
-		return errs
+func (s *Task) GetTask(id string) (*util.Task, error) {
+	byts, err := s.RedisConn.Get(id)
+	if err != nil {
+		return nil, err
 	}
 
-	go func() {
-		if s.MongoConn == nil {
-			return
-		}
-
-		task := prepareBsonTask(t)
-		if task.ID.IsZero() {
-			task.ID = primitive.NewObjectID()
-		}
-
-		err := s.MongoConn.Create(task)
-		if err != nil {
-			s.lgr.Error("failed to create task", err)
-		}
-	}()
-
-	return nil
+	task := &util.Task{}
+	if err := json.Unmarshal(byts, &task); err != nil {
+		return nil, err
+	}
+	return task, nil
 }
 
 func nextFibonacciNumber(numberA, numberB int64) int64 {
