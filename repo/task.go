@@ -29,45 +29,45 @@ func (s *Task) CloseClients() {
 }
 
 type bsonTask struct {
-	ID             primitive.ObjectID `bson:"_id"`
-	TaskID         string             `bson:"task_id"`
-	Name           string             `bson:"name"`
-	Payload        []byte             `bson:"payload"`
-	Priority       string             `bson:"priority"`
-	Status         string             `bson:"status"`
-	PreviousTaskID string             `bson:"previous_task_id"`
-	FailError      string             `bson:"fail_error"`
-	Duration       *float64           `bson:"duration"`
-	CreatedAt      time.Time          `bson:"created_at"`
-	UpdatedAt      time.Time          `bson:"updated_at"`
+	ID        primitive.ObjectID `bson:"_id"`
+	TaskID    string             `bson:"task_id"`
+	Name      string             `bson:"name"`
+	Payload   []byte             `bson:"payload"`
+	Priority  string             `bson:"priority"`
+	Status    string             `bson:"status"`
+	Retry     int                `bson:"retry"`
+	FailError string             `bson:"fail_error"`
+	Duration  *float64           `bson:"duration"`
+	CreatedAt time.Time          `bson:"created_at"`
+	UpdatedAt time.Time          `bson:"updated_at"`
 }
 
 func prepareBsonTask(t *util.Task) *bsonTask {
 	return &bsonTask{
-		TaskID:         t.ID,
-		Name:           t.Name,
-		Payload:        t.Payload,
-		Priority:       string(t.Priority),
-		PreviousTaskID: t.PreviousTaskID,
-		Status:         string(t.Status),
-		FailError:      t.FailError,
-		Duration:       t.Duration,
-		CreatedAt:      t.CreatedAt,
-		UpdatedAt:      t.UpdatedAt,
+		TaskID:    t.ID,
+		Name:      t.Name,
+		Payload:   t.Payload,
+		Priority:  string(t.Priority),
+		Retry:     t.Retry,
+		Status:    string(t.Status),
+		FailError: t.FailError,
+		Duration:  t.Duration,
+		CreatedAt: t.CreatedAt,
+		UpdatedAt: t.UpdatedAt,
 	}
 }
 
 func formTask(t *bsonTask) *util.Task {
 	return &util.Task{
-		ID:             t.TaskID,
-		Name:           t.Name,
-		Payload:        t.Payload,
-		Priority:       util.PriorityType(t.Priority),
-		PreviousTaskID: t.PreviousTaskID,
-		Status:         util.Status(t.Status),
-		FailError:      t.FailError,
-		CreatedAt:      t.CreatedAt,
-		UpdatedAt:      t.UpdatedAt,
+		ID:        t.TaskID,
+		Name:      t.Name,
+		Payload:   t.Payload,
+		Priority:  util.PriorityType(t.Priority),
+		Retry:     t.Retry,
+		Status:    util.Status(t.Status),
+		FailError: t.FailError,
+		CreatedAt: t.CreatedAt,
+		UpdatedAt: t.UpdatedAt,
 	}
 }
 
@@ -183,6 +183,11 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 				task.Duration = duration
 				task.FailError = ""
 				if failError != nil {
+					if task.Retry > 0 {
+						task.Retry -= 1
+						task.Status = string(util.StatusRetry)
+					}
+
 					task.FailError = failError.Error()
 				}
 
@@ -223,6 +228,11 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 		task.Duration = duration
 		task.FailError = ""
 		if failError != nil {
+			if task.Retry > 0 {
+				task.Retry -= 1
+				task.Status = util.StatusRetry
+			}
+
 			task.FailError = failError.Error()
 		}
 

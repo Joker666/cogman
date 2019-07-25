@@ -69,7 +69,7 @@ func (s *Session) SendTask(t util.Task) error {
 
 	close := ch.NotifyClose(make(chan *amqp.Error, 1))
 	publish := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
-	errs := make(chan error, 1)
+	publishErr := make(chan error, 1)
 
 	Queue := s.GetQueueName(t.Priority)
 
@@ -91,7 +91,7 @@ func (s *Session) SendTask(t util.Task) error {
 		)
 
 		if err != nil {
-			errs <- err
+			publishErr <- err
 			return
 		}
 
@@ -103,26 +103,29 @@ func (s *Session) SendTask(t util.Task) error {
 		done = time.After(s.cfg.RequestTimeout)
 	}
 
+	var errs error
+
 	select {
-	case err := <-close:
-		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, err)
-		return err
-	case err := <-errs:
-		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, err)
-		return err
+	case errs = <-close:
+
+	case errs = <-publishErr:
+
 	case p := <-publish:
 		if !p.Ack {
-			s.lgr.Warn("Task acknowledgement failed", util.Object{"TaskID", t.ID})
-			s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, ErrNotPublished)
-			return ErrNotPublished
+			s.lgr.Warn("Task deliver failed", util.Object{"TaskID", t.ID})
+			errs = ErrNotPublished
 		}
-		s.lgr.Info("Task acknowledged", util.Object{"TaskID", t.ID})
+		s.lgr.Info("Task delivered", util.Object{"TaskID", t.ID})
 	case <-done:
-		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, ErrRequestTimeout)
-		return ErrRequestTimeout
+		errs = ErrRequestTimeout
 	}
 
-	return nil
+	if errs != nil {
+		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, errs)
+		s.retryTask(t)
+	}
+
+	return errs
 }
 
 func (s *Session) GetQueueName(pType util.PriorityType) string {
@@ -154,6 +157,18 @@ func (s *Session) getQueueIndex() int {
 	s.queueIndex = s.queueIndex % s.cfg.AMQP.HighPriorityQueueCount
 
 	return index
+}
+
+func (s *Session) retryTask(t util.Task) {
+	if t.Retry <= 0 {
+		return
+	}
+
+	t.Retry--
+	if err := s.SendTask(t); err != nil {
+		s.lgr.Error("failed to retry", err, util.Object{"TaskID", t.ID})
+		return
+	}
 }
 
 func (s *Session) EnsureQueue(con *amqp.Connection, queue string) (*amqp.Queue, error) {
