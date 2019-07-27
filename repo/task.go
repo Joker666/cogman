@@ -75,6 +75,10 @@ func formTask(t *bsonTask) *util.Task {
 }
 
 func (s *Task) CreateTask(task *util.Task) error {
+	if task.Status != util.StatusRetry {
+		task.Status = util.StatusInitiated
+	}
+
 	nw := time.Now()
 	task.UpdatedAt = nw
 	task.CreatedAt = nw

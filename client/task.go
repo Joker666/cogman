@@ -41,12 +41,6 @@ func (s *Session) ReEnqueueUnhandledTasksBefore(t time.Time) error {
 func (s *Session) SendTask(t util.Task) error {
 	if t.TaskID == "" {
 		t.TaskID = uuid.New().String()
-		if t.Status != util.StatusRetry {
-			// Original task will have same value in TaskID & OriginalTaskID field
-			t.Status = util.StatusInitiated
-			t.OriginalTaskID = t.TaskID
-		}
-
 		if err := s.taskRepo.CreateTask(&t); err != nil {
 			return err
 		}
@@ -129,7 +123,29 @@ func (s *Session) SendTask(t util.Task) error {
 	if errs != nil {
 		s.taskRepo.UpdateTaskStatus(t.TaskID, util.StatusFailed, errs)
 		go func() {
-			s.retryTask(t)
+			task := util.Task{
+				TaskID:    "",
+				Name:      t.Name,
+				Retry:     0,
+				Payload:   t.Payload,
+				Priority:  t.Priority,
+				Status:    util.StatusRetry,
+				FailError: "",
+				Duration:  nil,
+			}
+
+			if t.OriginalTaskID == "" {
+				task.OriginalTaskID = t.TaskID
+			} else {
+				task.OriginalTaskID = t.OriginalTaskID
+			}
+
+			orgTask, err := s.taskRepo.GetTask(task.OriginalTaskID)
+			if err != nil || orgTask.Retry == 0 {
+				return
+			}
+
+			s.retryTask(task)
 		}()
 	}
 
@@ -168,34 +184,7 @@ func (s *Session) getQueueIndex() int {
 }
 
 func (s *Session) retryTask(t util.Task) {
-	task := util.Task{
-		TaskID:         "",
-		Name:           t.Name,
-		OriginalTaskID: t.OriginalTaskID,
-		Retry:          0,
-		Payload:        t.Payload,
-		Priority:       t.Priority,
-		Status:         util.StatusRetry,
-		FailError:      "",
-		Duration:       nil,
-	}
-
-	var err error
-	func() {
-		orgTask, err := s.taskRepo.GetTask(t.OriginalTaskID)
-		if err != nil {
-			return
-		}
-
-		if orgTask.Retry == 0 {
-			err = ErrRetryLimitExceeded
-			return
-		}
-
-		err = s.SendTask(task)
-	}()
-
-	if err != nil {
+	if err := s.SendTask(t); err != nil {
 		s.lgr.Error("failed to retry", err, util.Object{"TaskID", t.TaskID}, util.Object{"OriginalTaskID", t.OriginalTaskID})
 	}
 }
