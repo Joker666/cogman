@@ -39,8 +39,14 @@ func (s *Session) ReEnqueueUnhandledTasksBefore(t time.Time) error {
 
 // SendTask sends task t
 func (s *Session) SendTask(t util.Task) error {
-	if t.ID == "" {
-		t.ID = uuid.New().String()
+	if t.TaskID == "" {
+		t.TaskID = uuid.New().String()
+		if t.Status != util.StatusRetry {
+			// Original task will have same value in TaskID & OriginalTaskID field
+			t.Status = util.StatusInitiated
+			t.OriginalTaskID = t.TaskID
+		}
+
 		if err := s.taskRepo.CreateTask(&t); err != nil {
 			return err
 		}
@@ -48,7 +54,7 @@ func (s *Session) SendTask(t util.Task) error {
 
 	s.mu.RLock()
 	if !s.connected {
-		s.lgr.Warn("No connection. Task enqueued.", util.Object{"TaskID", t.ID})
+		s.lgr.Warn("No connection. Task enqueued.", util.Object{"TaskID", t.TaskID})
 		return ErrNotConnected
 	}
 	s.mu.RUnlock()
@@ -82,7 +88,7 @@ func (s *Session) SendTask(t util.Task) error {
 			amqp.Publishing{
 				Headers: map[string]interface{}{
 					"TaskName": t.Name,
-					"TaskID":   t.ID,
+					"TaskID":   t.TaskID,
 				},
 				Type:         t.Name,
 				DeliveryMode: amqp.Persistent,
@@ -95,7 +101,7 @@ func (s *Session) SendTask(t util.Task) error {
 			return
 		}
 
-		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusQueued)
+		s.taskRepo.UpdateTaskStatus(t.TaskID, util.StatusQueued)
 	}()
 
 	done := (<-chan time.Time)(make(chan time.Time, 1))
@@ -112,16 +118,16 @@ func (s *Session) SendTask(t util.Task) error {
 
 	case p := <-publish:
 		if !p.Ack {
-			s.lgr.Warn("Task deliver failed", util.Object{"TaskID", t.ID})
+			s.lgr.Warn("Task deliver failed", util.Object{"TaskID", t.TaskID})
 			errs = ErrNotPublished
 		}
-		s.lgr.Info("Task delivered", util.Object{"TaskID", t.ID})
+		s.lgr.Info("Task delivered", util.Object{"TaskID", t.TaskID})
 	case <-done:
 		errs = ErrRequestTimeout
 	}
 
 	if errs != nil {
-		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, errs)
+		s.taskRepo.UpdateTaskStatus(t.TaskID, util.StatusFailed, errs)
 		go func() {
 			s.retryTask(t)
 		}()
@@ -163,9 +169,9 @@ func (s *Session) getQueueIndex() int {
 
 func (s *Session) retryTask(t util.Task) {
 	task := util.Task{
-		ID:             "",
+		TaskID:         "",
 		Name:           t.Name,
-		OriginalTaskID: t.ID,
+		OriginalTaskID: t.OriginalTaskID,
 		Retry:          0,
 		Payload:        t.Payload,
 		Priority:       t.Priority,
@@ -176,12 +182,12 @@ func (s *Session) retryTask(t util.Task) {
 
 	var err error
 	func() {
-		prvTask, err := s.taskRepo.GetTask(t.OriginalTaskID)
+		orgTask, err := s.taskRepo.GetTask(t.OriginalTaskID)
 		if err != nil {
 			return
 		}
 
-		if prvTask.Retry == 0 {
+		if orgTask.Retry == 0 {
 			err = ErrRetryLimitExceeded
 			return
 		}
@@ -190,7 +196,7 @@ func (s *Session) retryTask(t util.Task) {
 	}()
 
 	if err != nil {
-		s.lgr.Error("failed to retry", err, util.Object{"TaskID", t.ID})
+		s.lgr.Error("failed to retry", err, util.Object{"TaskID", t.TaskID}, util.Object{"OriginalTaskID", t.OriginalTaskID})
 	}
 }
 
