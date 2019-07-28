@@ -26,7 +26,7 @@ type Server struct {
 	running bool
 
 	cfg     *config.Server
-	taskRep repo.Task
+	taskRep *repo.Task
 	acon    *amqp.Connection
 
 	workers map[string]*worker
@@ -199,19 +199,20 @@ func (s *Server) bootstrap() error {
 		s.workers[t.Name] = wrkr
 	}
 
+	var mcl *infra.MongoClient
 	if s.cfg.Mongo.URI != "" {
 		s.lgr.Debug("connecting mongodb", util.Object{"uri", s.cfg.Mongo.URI})
-		mcl, err := infra.NewMongoClient(s.cfg.Mongo.URI)
+		con, err := infra.NewMongoClient(s.cfg.Mongo.URI)
 		if err != nil {
 			return err
 		}
 
 		s.lgr.Debug("pinging mongodb", util.Object{"uri", s.cfg.Mongo.URI})
-		if err := mcl.Ping(); err != nil {
+		if err := con.Ping(); err != nil {
 			return err
 		}
 
-		s.taskRep.MongoConn = mcl
+		mcl = con
 	}
 
 	s.lgr.Debug("dialing amqp", util.Object{"uri", s.cfg.AMQP.URI})
@@ -227,7 +228,8 @@ func (s *Server) bootstrap() error {
 	if err := rcon.Ping(); err != nil {
 		s.lgr.Error("failed redis ping", err)
 	}
-	s.taskRep.RedisConn = rcon
+
+	s.taskRep = repo.NewTaskRepo(rcon, mcl)
 
 	return nil
 }
