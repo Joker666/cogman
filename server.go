@@ -111,7 +111,17 @@ func (s *Server) Start() error {
 	s.lgr.Debug("ensuring queue: ")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
 		queue := getQueueName(util.HighPriorityQueue, i)
-		if err := ensureQueue(s.acon, queue); err != nil {
+		if err := ensureQueue(s.acon, queue, util.TaskPriorityHigh); err != nil {
+			s.lgr.Error("failed to ensure queue: "+queue, err)
+			return err
+		}
+
+		s.lgr.Debug(queue + " ensured")
+	}
+
+	for i := 0; i < s.cfg.AMQP.LowPriorityQueueCount; i++ {
+		queue := getQueueName(util.LowPriorityQueue, i)
+		if err := ensureQueue(s.acon, queue, util.TaskPriorityLow); err != nil {
 			s.lgr.Error("failed to ensure queue: "+queue, err)
 			return err
 		}
@@ -146,10 +156,15 @@ func (s *Server) Start() error {
 	return nil
 }
 
-func ensureQueue(con *amqp.Connection, queue string) error {
+func ensureQueue(con *amqp.Connection, queue string, taskType util.TaskPriority) error {
 	chnl, err := con.Channel()
 	if err != nil {
 		return err
+	}
+
+	mode := util.QueueModeLazy
+	if taskType == util.TaskPriorityHigh {
+		mode = util.QueueModeDefault
 	}
 
 	_, err = chnl.QueueDeclare(
@@ -158,7 +173,9 @@ func ensureQueue(con *amqp.Connection, queue string) error {
 		false,
 		false,
 		false,
-		nil,
+		amqp.Table{
+			"x-queue-mode": mode,
+		},
 	)
 	if err != nil {
 		return err
@@ -266,32 +283,12 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 	s.lgr.Debug("creating consumer")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
 		queue := getQueueName(util.HighPriorityQueue, i)
+		s.setConsumer(ctx, chnl, queue, util.QueueModeDefault, taskPool)
+	}
 
-		go func() {
-			msg, err := chnl.Consume(
-				queue,
-				"",
-				true,
-				false,
-				false,
-				false,
-				nil,
-			)
-			if err != nil {
-				s.lgr.Error("failed to create consumer", err)
-				return
-			}
-
-			for {
-				select {
-				case <-ctx.Done():
-					s.lgr.Debug("queue closing", util.Object{"queue", queue})
-					return
-				case taskPool <- (<-msg):
-					s.lgr.Debug("new task", util.Object{"queue", queue})
-				}
-			}
-		}()
+	for i := 0; i < s.cfg.AMQP.LowPriorityQueueCount; i++ {
+		queue := getQueueName(util.LowPriorityQueue, i)
+		s.setConsumer(ctx, chnl, queue, util.QueueModeLazy, taskPool)
 	}
 
 	wg := sync.WaitGroup{}
@@ -380,6 +377,36 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 	wg.Wait()
 
 	return err
+}
+
+func (s *Server) setConsumer(ctx context.Context, chnl *amqp.Channel, queue string, mode string, taskPool chan<- amqp.Delivery) {
+	go func() {
+		msg, err := chnl.Consume(
+			queue,
+			"",
+			true,
+			false,
+			false,
+			false,
+			amqp.Table{
+				"x-queue-mode": mode,
+			},
+		)
+		if err != nil {
+			s.lgr.Error("failed to create consumer", err)
+			return
+		}
+
+		for {
+			select {
+			case <-ctx.Done():
+				s.lgr.Debug("queue closing", util.Object{"queue", queue})
+				return
+			case taskPool <- (<-msg):
+				s.lgr.Debug("new task", util.Object{"queue", queue})
+			}
+		}
+	}()
 }
 
 func getQueueName(prefix string, id int) string {

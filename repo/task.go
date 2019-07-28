@@ -64,7 +64,7 @@ func formTask(t *bsonTask) *util.Task {
 		ID:             t.TaskID,
 		Name:           t.Name,
 		Payload:        t.Payload,
-		Priority:       util.PriorityType(t.Priority),
+		Priority:       util.TaskPriority(t.Priority),
 		OriginalTaskID: t.OriginalTaskID,
 		Retry:          t.Retry,
 		Status:         util.Status(t.Status),

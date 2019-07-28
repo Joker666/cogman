@@ -27,7 +27,7 @@ type Session struct {
 	reconn chan *amqp.Error
 
 	lgr        util.Logger
-	queueIndex int
+	queueIndex map[string]int
 }
 
 // NewSession creates new client session with config cfg
@@ -37,9 +37,12 @@ func NewSession(cfg config.Client) (*Session, error) {
 	}
 
 	return &Session{
-		cfg:        &cfg,
-		lgr:        util.NewLogger(),
-		queueIndex: 0,
+		cfg: &cfg,
+		lgr: util.NewLogger(),
+		queueIndex: map[string]int{
+			util.QueueModeLazy:    0,
+			util.QueueModeDefault: 0,
+		},
 	}, nil
 }
 
