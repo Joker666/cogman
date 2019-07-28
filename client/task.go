@@ -121,32 +121,29 @@ func (s *Session) SendTask(t util.Task) error {
 	}
 
 	if errs != nil {
-		s.taskRepo.UpdateTaskStatus(t.TaskID, util.StatusFailed, errs)
-		go func() {
-			task := util.Task{
-				TaskID:    "",
-				Name:      t.Name,
-				Retry:     0,
-				Payload:   t.Payload,
-				Priority:  t.Priority,
-				Status:    util.StatusRetry,
-				FailError: "",
-				Duration:  nil,
-			}
+		orgTaskID := t.OriginalTaskID
+		if orgTaskID == "" {
+			orgTaskID = t.TaskID
+		}
 
-			if t.OriginalTaskID == "" {
-				task.OriginalTaskID = t.TaskID
-			} else {
-				task.OriginalTaskID = t.OriginalTaskID
+		orgTask, err := s.taskRepo.GetTask(orgTaskID)
+		if err != nil {
+			s.lgr.Error("failed to get task", err, util.Object{"TaskID", orgTaskID})
+		} else {
+			s.taskRepo.UpdateTaskStatus(t.TaskID, util.StatusFailed, errs)
+			if orgTask.Retry != 0 {
+				go func() {
+					task := util.Task{
+						Name:           t.Name,
+						OriginalTaskID: orgTaskID,
+						Payload:        t.Payload,
+						Priority:       t.Priority,
+						Status:         util.StatusRetry,
+					}
+					s.retryTask(task)
+				}()
 			}
-
-			orgTask, err := s.taskRepo.GetTask(task.OriginalTaskID)
-			if err != nil || orgTask.Retry == 0 {
-				return
-			}
-
-			s.retryTask(task)
-		}()
+		}
 	}
 
 	return errs
