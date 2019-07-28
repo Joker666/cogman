@@ -23,15 +23,18 @@ func (s *Session) getQueueIndex(taskType util.TaskPriority) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	index := 0
-	switch taskType {
-	case util.TaskPriorityHigh:
-		index = s.queueIndex[util.QueueModeDefault]
-		s.queueIndex[util.QueueModeDefault] = (s.queueIndex[util.QueueModeDefault] + 1) % s.cfg.AMQP.HighPriorityQueueCount
-	case util.TaskPriorityLow:
-		index = s.queueIndex[util.QueueModeLazy]
-		s.queueIndex[util.QueueModeLazy] = (s.queueIndex[util.QueueModeLazy] + 1) % s.cfg.AMQP.LowPriorityQueueCount
+	count := map[string]int{
+		util.QueueModeDefault: s.cfg.AMQP.HighPriorityQueueCount,
+		util.QueueModeLazy:    s.cfg.AMQP.LowPriorityQueueCount,
 	}
+
+	mode := util.QueueModeLazy
+	if taskType == util.TaskPriorityHigh {
+		mode = util.QueueModeDefault
+	}
+
+	index := s.queueIndex[mode]
+	s.queueIndex[mode] = (s.queueIndex[mode] + 1) % count[mode]
 
 	return index
 }
