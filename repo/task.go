@@ -19,6 +19,13 @@ type Task struct {
 	lgr util.Logger
 }
 
+func NewTaskRepo(redisCon *infra.RedisClient, mgoCon *infra.MongoClient) *Task {
+	return &Task{
+		RedisConn: redisCon,
+		MongoConn: mgoCon,
+	}
+}
+
 func (s *Task) SetLogger() {
 	s.lgr = util.NewLogger()
 }
