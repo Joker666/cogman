@@ -8,7 +8,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func (s *Session) getQueueName(taskType util.TaskPriority) string {
+func (s *Session) formQueueName(taskType util.TaskPriority) string {
 	queueType := util.LowPriorityQueue
 	if taskType == util.TaskPriorityHigh {
 		queueType = util.HighPriorityQueue
@@ -42,7 +42,7 @@ func (s *Session) getQueueIndex(taskType util.TaskPriority) int {
 func (s *Session) GetQueueName(pType util.TaskPriority) string {
 	name := ""
 	for {
-		queue := s.getQueueName(pType)
+		queue := s.formQueueName(pType)
 		if _, err := s.EnsureQueue(s.conn, queue, pType); err == nil {
 			name = queue
 			break

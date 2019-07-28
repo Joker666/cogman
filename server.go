@@ -110,7 +110,7 @@ func (s *Server) Start() error {
 	// TODO: Handle low priority queue
 	s.lgr.Debug("ensuring queue: ")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
-		queue := getQueueName(util.HighPriorityQueue, i)
+		queue := formQueueName(util.HighPriorityQueue, i)
 		if err := ensureQueue(s.acon, queue, util.TaskPriorityHigh); err != nil {
 			s.lgr.Error("failed to ensure queue: "+queue, err)
 			return err
@@ -120,7 +120,7 @@ func (s *Server) Start() error {
 	}
 
 	for i := 0; i < s.cfg.AMQP.LowPriorityQueueCount; i++ {
-		queue := getQueueName(util.LowPriorityQueue, i)
+		queue := formQueueName(util.LowPriorityQueue, i)
 		if err := ensureQueue(s.acon, queue, util.TaskPriorityLow); err != nil {
 			s.lgr.Error("failed to ensure queue: "+queue, err)
 			return err
@@ -284,12 +284,12 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 	// TODO: Handle low priority queue
 	s.lgr.Debug("creating consumer")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
-		queue := getQueueName(util.HighPriorityQueue, i)
+		queue := formQueueName(util.HighPriorityQueue, i)
 		s.setConsumer(ctx, chnl, queue, util.QueueModeDefault, taskPool)
 	}
 
 	for i := 0; i < s.cfg.AMQP.LowPriorityQueueCount; i++ {
-		queue := getQueueName(util.LowPriorityQueue, i)
+		queue := formQueueName(util.LowPriorityQueue, i)
 		s.setConsumer(ctx, chnl, queue, util.QueueModeLazy, taskPool)
 	}
 
@@ -411,6 +411,6 @@ func (s *Server) setConsumer(ctx context.Context, chnl *amqp.Channel, queue stri
 	}()
 }
 
-func getQueueName(prefix string, id int) string {
+func formQueueName(prefix string, id int) string {
 	return prefix + "_" + strconv.Itoa(id)
 }
