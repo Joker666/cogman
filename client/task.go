@@ -39,8 +39,12 @@ func (s *Session) ReEnqueueUnhandledTasksBefore(t time.Time) error {
 
 // SendTask sends task t
 func (s *Session) SendTask(t util.Task) error {
-	if t.ID == "" {
-		t.ID = uuid.New().String()
+	if t.TaskID == "" {
+		t.TaskID = uuid.New().String()
+		if t.OriginalTaskID == "" {
+			t.OriginalTaskID = t.TaskID
+		}
+
 		if err := s.taskRepo.CreateTask(&t); err != nil {
 			return err
 		}
@@ -48,7 +52,7 @@ func (s *Session) SendTask(t util.Task) error {
 
 	s.mu.RLock()
 	if !s.connected {
-		s.lgr.Warn("No connection. Task enqueued.", util.Object{"TaskID", t.ID})
+		s.lgr.Warn("No connection. Task enqueued.", util.Object{"TaskID", t.TaskID})
 		return ErrNotConnected
 	}
 	s.mu.RUnlock()
@@ -69,7 +73,7 @@ func (s *Session) SendTask(t util.Task) error {
 
 	close := ch.NotifyClose(make(chan *amqp.Error, 1))
 	publish := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
-	errs := make(chan error, 1)
+	publishErr := make(chan error, 1)
 
 	Queue := s.GetQueueName(t.Priority)
 
@@ -82,7 +86,7 @@ func (s *Session) SendTask(t util.Task) error {
 			amqp.Publishing{
 				Headers: map[string]interface{}{
 					"TaskName": t.Name,
-					"TaskID":   t.ID,
+					"TaskID":   t.TaskID,
 				},
 				Type:         t.Name,
 				DeliveryMode: amqp.Persistent,
@@ -91,11 +95,11 @@ func (s *Session) SendTask(t util.Task) error {
 		)
 
 		if err != nil {
-			errs <- err
+			publishErr <- err
 			return
 		}
 
-		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusQueued)
+		s.taskRepo.UpdateTaskStatus(t.TaskID, util.StatusQueued)
 	}()
 
 	done := (<-chan time.Time)(make(chan time.Time, 1))
@@ -103,26 +107,38 @@ func (s *Session) SendTask(t util.Task) error {
 		done = time.After(s.cfg.RequestTimeout)
 	}
 
+	var errs error
+
 	select {
-	case err := <-close:
-		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, err)
-		return err
-	case err := <-errs:
-		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, err)
-		return err
+	case errs = <-close:
+
+	case errs = <-publishErr:
+
 	case p := <-publish:
 		if !p.Ack {
-			s.lgr.Warn("Task acknowledgement failed", util.Object{"TaskID", t.ID})
-			s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, ErrNotPublished)
-			return ErrNotPublished
+			s.lgr.Warn("Task deliver failed", util.Object{"TaskID", t.TaskID})
+			errs = ErrNotPublished
 		}
-		s.lgr.Info("Task acknowledged", util.Object{"TaskID", t.ID})
+		s.lgr.Info("Task delivered", util.Object{"TaskID", t.TaskID})
 	case <-done:
-		s.taskRepo.UpdateTaskStatus(t.ID, util.StatusFailed, ErrRequestTimeout)
-		return ErrRequestTimeout
+		errs = ErrRequestTimeout
 	}
 
-	return nil
+	if errs != nil {
+		orgTask, err := s.taskRepo.GetTask(t.OriginalTaskID)
+		if err != nil {
+			s.lgr.Error("failed to get task", err, util.Object{"TaskID", t.OriginalTaskID})
+		} else {
+			s.taskRepo.UpdateTaskStatus(t.TaskID, util.StatusFailed, errs)
+			if orgTask.Retry != 0 {
+				go func() {
+					s.retryTask(t)
+				}()
+			}
+		}
+	}
+
+	return errs
 }
 
 func (s *Session) GetQueueName(pType util.PriorityType) string {
@@ -154,6 +170,20 @@ func (s *Session) getQueueIndex() int {
 	s.queueIndex = s.queueIndex % s.cfg.AMQP.HighPriorityQueueCount
 
 	return index
+}
+
+func (s *Session) retryTask(t util.Task) {
+	task := util.Task{
+		Name:           t.Name,
+		OriginalTaskID: t.OriginalTaskID,
+		Payload:        t.Payload,
+		Priority:       t.Priority,
+		Status:         util.StatusRetry,
+	}
+
+	if err := s.SendTask(task); err != nil {
+		s.lgr.Error("failed to retry", err, util.Object{"TaskID", task.TaskID}, util.Object{"OriginalTaskID", task.OriginalTaskID})
+	}
 }
 
 func (s *Session) EnsureQueue(con *amqp.Connection, queue string) (*amqp.Queue, error) {

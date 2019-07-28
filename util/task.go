@@ -5,6 +5,7 @@ import "time"
 type Status string
 
 const (
+	StatusRetry      Status = "retry"
 	StatusInitiated  Status = "initiated"
 	StatusQueued     Status = "queued"
 	StatusInProgress Status = "in_progress"
@@ -24,9 +25,10 @@ func (p PriorityType) Valid() bool {
 }
 
 type Task struct {
-	ID             string
+	TaskID         string
 	Name           string
-	PreviousTaskID string
+	OriginalTaskID string
+	Retry          int
 	Payload        []byte
 	Priority       PriorityType
 	Status         Status
@@ -39,12 +41,13 @@ type Task struct {
 // CheckStatusOrder check if status st can be updated by status p
 func (p Status) CheckStatusOrder(st Status) bool {
 	val := map[Status]int{
-		StatusFailed:     0,
-		StatusInitiated:  0,
-		StatusQueued:     0,
-		StatusInProgress: 0,
+		StatusRetry:      0,
+		StatusInitiated:  1,
+		StatusQueued:     2,
+		StatusInProgress: 3,
+		StatusFailed:     4,
 		StatusSuccess:    4,
 	}
 
-	return val[p] >= val[st]
+	return val[p] > val[st]
 }

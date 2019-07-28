@@ -19,6 +19,13 @@ type Task struct {
 	lgr util.Logger
 }
 
+func NewTaskRepo(redisCon *infra.RedisClient, mgoCon *infra.MongoClient) *Task {
+	return &Task{
+		RedisConn: redisCon,
+		MongoConn: mgoCon,
+	}
+}
+
 func (s *Task) SetLogger() {
 	s.lgr = util.NewLogger()
 }
@@ -32,10 +39,11 @@ type bsonTask struct {
 	ID             primitive.ObjectID `bson:"_id"`
 	TaskID         string             `bson:"task_id"`
 	Name           string             `bson:"name"`
+	OriginalTaskID string             `bson:"original_task_id"`
 	Payload        []byte             `bson:"payload"`
 	Priority       string             `bson:"priority"`
 	Status         string             `bson:"status"`
-	PreviousTaskID string             `bson:"previous_task_id"`
+	Retry          int                `bson:"retry"`
 	FailError      string             `bson:"fail_error"`
 	Duration       *float64           `bson:"duration"`
 	CreatedAt      time.Time          `bson:"created_at"`
@@ -44,11 +52,12 @@ type bsonTask struct {
 
 func prepareBsonTask(t *util.Task) *bsonTask {
 	return &bsonTask{
-		TaskID:         t.ID,
+		TaskID:         t.TaskID,
 		Name:           t.Name,
 		Payload:        t.Payload,
 		Priority:       string(t.Priority),
-		PreviousTaskID: t.PreviousTaskID,
+		OriginalTaskID: t.OriginalTaskID,
+		Retry:          t.Retry,
 		Status:         string(t.Status),
 		FailError:      t.FailError,
 		Duration:       t.Duration,
@@ -59,11 +68,12 @@ func prepareBsonTask(t *util.Task) *bsonTask {
 
 func formTask(t *bsonTask) *util.Task {
 	return &util.Task{
-		ID:             t.TaskID,
+		TaskID:         t.TaskID,
 		Name:           t.Name,
 		Payload:        t.Payload,
 		Priority:       util.PriorityType(t.Priority),
-		PreviousTaskID: t.PreviousTaskID,
+		OriginalTaskID: t.OriginalTaskID,
+		Retry:          t.Retry,
 		Status:         util.Status(t.Status),
 		FailError:      t.FailError,
 		CreatedAt:      t.CreatedAt,
@@ -72,9 +82,11 @@ func formTask(t *bsonTask) *util.Task {
 }
 
 func (s *Task) CreateTask(task *util.Task) error {
-	nw := time.Now()
+	if task.Status != util.StatusRetry {
+		task.Status = util.StatusInitiated
+	}
 
-	task.Status = util.StatusInitiated
+	nw := time.Now()
 	task.UpdatedAt = nw
 	task.CreatedAt = nw
 
@@ -103,7 +115,7 @@ func (s *Task) CreateTask(task *util.Task) error {
 			return
 		}
 
-		err = s.RedisConn.Create(task.ID, byts)
+		err = s.RedisConn.Create(task.TaskID, byts)
 		if err != nil {
 			errs = err
 			return
@@ -113,23 +125,36 @@ func (s *Task) CreateTask(task *util.Task) error {
 	return errs
 }
 
+func (s *Task) GetTask(id string) (*util.Task, error) {
+	byts, err := s.RedisConn.Get(id)
+	if err != nil {
+		return nil, err
+	}
+
+	task := &util.Task{}
+	if err := json.Unmarshal(byts, &task); err != nil {
+		return nil, err
+	}
+	return task, nil
+}
+
 func nextFibonacciNumber(numberA, numberB int64) int64 {
 	return numberA + numberB
 }
 
 func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface{}) {
 	var failError error
-	if status == util.StatusFailed {
+	var duration *float64
+
+	switch status {
+	case util.StatusFailed:
 		err, ok := args[0].(error)
 		if !ok {
 			s.lgr.Error("UpdateTaskStatus", ErrErrorRequired)
 			return
 		}
 		failError = err
-	}
-
-	var duration *float64
-	if status == util.StatusSuccess {
+	case util.StatusSuccess:
 		dur, ok := args[0].(float64)
 		if !ok {
 			s.lgr.Error("UpdateTaskStatus", ErrDurationRequired)
@@ -183,6 +208,9 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 				task.Duration = duration
 				task.FailError = ""
 				if failError != nil {
+					if task.Retry > 0 {
+						task.Retry--
+					}
 					task.FailError = failError.Error()
 				}
 
@@ -223,6 +251,9 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 		task.Duration = duration
 		task.FailError = ""
 		if failError != nil {
+			if task.Retry > 0 {
+				task.Retry--
+			}
 			task.FailError = failError.Error()
 		}
 
@@ -232,13 +263,12 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 			return
 		}
 
-		errs = s.RedisConn.Update(task.ID, byts)
+		errs = s.RedisConn.Update(task.TaskID, byts)
 
 	}()
 
 	if errs != nil {
 		s.lgr.Error("failed to update task", errs, util.Object{"TaskID", id}, util.Object{"Status", status})
-
 	}
 }
 

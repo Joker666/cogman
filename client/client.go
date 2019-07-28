@@ -21,7 +21,7 @@ type Session struct {
 	connected bool
 
 	conn     *amqp.Connection
-	taskRepo repo.Task
+	taskRepo *repo.Task
 
 	done   chan struct{}
 	reconn chan *amqp.Error
@@ -69,20 +69,22 @@ func (s *Session) Connect() error {
 	if err := rcon.Ping(); err != nil {
 		return err
 	}
-	s.taskRepo.RedisConn = rcon
 
+	var mcon *infra.MongoClient
 	if s.cfg.Mongo.URI != "" {
-		mcon, err := infra.NewMongoClient(s.cfg.Mongo.URI)
+		con, err := infra.NewMongoClient(s.cfg.Mongo.URI)
 		if err != nil {
 			return err
 		}
 
-		if err := mcon.Ping(); err != nil {
+		if err := con.Ping(); err != nil {
 			return err
 		}
 
-		s.taskRepo.MongoConn = mcon
+		mcon = con
 	}
+
+	s.taskRepo = repo.NewTaskRepo(rcon, mcon)
 
 	s.taskRepo.SetLogger()
 
