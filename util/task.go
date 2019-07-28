@@ -25,7 +25,7 @@ func (p TaskPriority) Valid() bool {
 }
 
 type Task struct {
-	ID             string
+	TaskID         string
 	Name           string
 	OriginalTaskID string
 	Retry          int
@@ -42,12 +42,12 @@ type Task struct {
 func (p Status) CheckStatusOrder(st Status) bool {
 	val := map[Status]int{
 		StatusRetry:      0,
-		StatusFailed:     1,
 		StatusInitiated:  1,
-		StatusQueued:     1,
-		StatusInProgress: 1,
+		StatusQueued:     2,
+		StatusInProgress: 3,
+		StatusFailed:     4,
 		StatusSuccess:    4,
 	}
 
-	return val[p] >= val[st]
+	return val[p] > val[st]
 }

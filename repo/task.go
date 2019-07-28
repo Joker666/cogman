@@ -45,7 +45,7 @@ type bsonTask struct {
 
 func prepareBsonTask(t *util.Task) *bsonTask {
 	return &bsonTask{
-		TaskID:         t.ID,
+		TaskID:         t.TaskID,
 		Name:           t.Name,
 		Payload:        t.Payload,
 		Priority:       string(t.Priority),
@@ -61,7 +61,7 @@ func prepareBsonTask(t *util.Task) *bsonTask {
 
 func formTask(t *bsonTask) *util.Task {
 	return &util.Task{
-		ID:             t.TaskID,
+		TaskID:         t.TaskID,
 		Name:           t.Name,
 		Payload:        t.Payload,
 		Priority:       util.TaskPriority(t.Priority),
@@ -75,9 +75,11 @@ func formTask(t *bsonTask) *util.Task {
 }
 
 func (s *Task) CreateTask(task *util.Task) error {
-	nw := time.Now()
+	if task.Status != util.StatusRetry {
+		task.Status = util.StatusInitiated
+	}
 
-	task.Status = util.StatusInitiated
+	nw := time.Now()
 	task.UpdatedAt = nw
 	task.CreatedAt = nw
 
@@ -106,7 +108,7 @@ func (s *Task) CreateTask(task *util.Task) error {
 			return
 		}
 
-		err = s.RedisConn.Create(task.ID, byts)
+		err = s.RedisConn.Create(task.TaskID, byts)
 		if err != nil {
 			errs = err
 			return
@@ -254,7 +256,7 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 			return
 		}
 
-		errs = s.RedisConn.Update(task.ID, byts)
+		errs = s.RedisConn.Update(task.TaskID, byts)
 
 	}()
 
