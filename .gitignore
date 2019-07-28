@@ -5,3 +5,4 @@ storage
 *.env
 *.log
 .DS_Store
+.idea
