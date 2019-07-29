@@ -13,7 +13,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-// Session holds necessery fields of a client session
+// Session holds necessary fields of a client session
 type Session struct {
 	cfg *config.Client
 
@@ -109,7 +109,7 @@ func (s *Session) Connect() error {
 	s.connected = true
 
 	go func() {
-		s.handleReconnect()
+		_ = s.handleReconnect()
 	}()
 
 	if s.taskRepo.MongoConn != nil {

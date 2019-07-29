@@ -22,7 +22,7 @@ func (s *Session) ReEnqueueUnhandledTasksBefore(t time.Time) error {
 		if len(tasks) == 0 {
 			break
 		}
-		s.lgr.Info("Re-Enqueuing", util.Object{"Total Task", len(tasks)})
+		s.lgr.Info("Re-Enqueuing", util.Object{Key: "Total Task", Val: len(tasks)})
 
 		skip += limit
 
@@ -51,7 +51,7 @@ func (s *Session) SendTask(t util.Task) error {
 
 	s.mu.RLock()
 	if !s.connected {
-		s.lgr.Warn("No connection. Task enqueued.", util.Object{"TaskID", t.TaskID})
+		s.lgr.Warn("No connection. Task enqueued.", util.Object{Key: "TaskID", Val: t.TaskID})
 		return ErrNotConnected
 	}
 	s.mu.RUnlock()
@@ -70,7 +70,7 @@ func (s *Session) SendTask(t util.Task) error {
 		return err
 	}
 
-	close := ch.NotifyClose(make(chan *amqp.Error, 1))
+	closeNotification := ch.NotifyClose(make(chan *amqp.Error, 1))
 	publish := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
 	publishErr := make(chan error, 1)
 
@@ -109,16 +109,16 @@ func (s *Session) SendTask(t util.Task) error {
 	var errs error
 
 	select {
-	case errs = <-close:
+	case errs = <-closeNotification:
 
 	case errs = <-publishErr:
 
 	case p := <-publish:
 		if !p.Ack {
-			s.lgr.Warn("Task deliver failed", util.Object{"TaskID", t.TaskID})
+			s.lgr.Warn("Task deliver failed", util.Object{Key: "TaskID", Val: t.TaskID})
 			errs = ErrNotPublished
 		}
-		s.lgr.Info("Task delivered", util.Object{"TaskID", t.TaskID})
+		s.lgr.Info("Task delivered", util.Object{Key: "TaskID", Val: t.TaskID})
 	case <-done:
 		errs = ErrRequestTimeout
 	}
@@ -126,7 +126,7 @@ func (s *Session) SendTask(t util.Task) error {
 	if errs != nil {
 		orgTask, err := s.taskRepo.GetTask(t.OriginalTaskID)
 		if err != nil {
-			s.lgr.Error("failed to get task", err, util.Object{"TaskID", t.OriginalTaskID})
+			s.lgr.Error("failed to get task", err, util.Object{Key: "TaskID", Val: t.OriginalTaskID})
 		} else {
 			s.taskRepo.UpdateTaskStatus(t.TaskID, util.StatusFailed, errs)
 			if orgTask.Retry != 0 {
@@ -150,6 +150,6 @@ func (s *Session) retryTask(t util.Task) {
 	}
 
 	if err := s.SendTask(task); err != nil {
-		s.lgr.Error("failed to retry", err, util.Object{"TaskID", task.TaskID}, util.Object{"OriginalTaskID", task.OriginalTaskID})
+		s.lgr.Error("failed to retry", err, util.Object{Key: "TaskID", Val: task.TaskID}, util.Object{"OriginalTaskID", task.OriginalTaskID})
 	}
 }

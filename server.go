@@ -103,7 +103,7 @@ func (s *Server) Start() error {
 	defer func() {
 		s.lgr.Debug("closing connections")
 		s.taskRep.CloseClients()
-		s.acon.Close()
+		_ = s.acon.Close()
 		s.running = false
 	}()
 
@@ -111,7 +111,7 @@ func (s *Server) Start() error {
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
 		queue := formQueueName(util.HighPriorityQueue, i)
 		if err := ensureQueue(s.acon, queue, util.TaskPriorityHigh); err != nil {
-			s.lgr.Error("failed to ensure queue", err, util.Object{"queue_name", queue})
+			s.lgr.Error("failed to ensure queue", err, util.Object{Key: "queue_name", Val: queue})
 			return err
 		}
 
@@ -121,7 +121,7 @@ func (s *Server) Start() error {
 	for i := 0; i < s.cfg.AMQP.LowPriorityQueueCount; i++ {
 		queue := formQueueName(util.LowPriorityQueue, i)
 		if err := ensureQueue(s.acon, queue, util.TaskPriorityLow); err != nil {
-			s.lgr.Error("failed to ensure queue", err, util.Object{"queue_name", queue})
+			s.lgr.Error("failed to ensure queue", err, util.Object{Key: "queue_name", Val: queue})
 			return err
 		}
 
@@ -135,7 +135,7 @@ func (s *Server) Start() error {
 
 	go func() {
 		// TODO: handle error
-		s.consume(ctx, s.cfg.AMQP.Prefetch)
+		_ = s.consume(ctx, s.cfg.AMQP.Prefetch)
 		wg.Done()
 	}()
 
@@ -200,13 +200,13 @@ func (s *Server) bootstrap() error {
 
 	var mcl *infra.MongoClient
 	if s.cfg.Mongo.URI != "" {
-		s.lgr.Debug("connecting mongodb", util.Object{"uri", s.cfg.Mongo.URI})
+		s.lgr.Debug("connecting mongodb", util.Object{Key: "uri", Val: s.cfg.Mongo.URI})
 		con, err := infra.NewMongoClient(s.cfg.Mongo.URI)
 		if err != nil {
 			return err
 		}
 
-		s.lgr.Debug("pinging mongodb", util.Object{"uri", s.cfg.Mongo.URI})
+		s.lgr.Debug("pinging mongodb", util.Object{Key: "uri", Val: s.cfg.Mongo.URI})
 		if err := con.Ping(); err != nil {
 			return err
 		}
@@ -214,7 +214,7 @@ func (s *Server) bootstrap() error {
 		mcl = con
 	}
 
-	s.lgr.Debug("dialing amqp", util.Object{"uri", s.cfg.AMQP.URI})
+	s.lgr.Debug("dialing amqp", util.Object{Key: "uri", Val: s.cfg.AMQP.URI})
 	acl, err := amqp.Dial(s.cfg.AMQP.URI)
 	if err != nil {
 		s.lgr.Error("failed amqp dial", err)
@@ -223,7 +223,7 @@ func (s *Server) bootstrap() error {
 	s.acon = acl
 
 	rcon := infra.NewRedisClient(s.cfg.Redis.URI)
-	s.lgr.Debug("pinging redis", util.Object{"uri", s.cfg.Redis.URI})
+	s.lgr.Debug("pinging redis", util.Object{Key: "uri", Val: s.cfg.Redis.URI})
 	if err := rcon.Ping(); err != nil {
 		s.lgr.Error("failed redis ping", err)
 	}
@@ -278,7 +278,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 	}
 
 	taskPool := make(chan amqp.Delivery)
-	close := chnl.NotifyClose(make(chan *amqp.Error, 1))
+	closeNotification := chnl.NotifyClose(make(chan *amqp.Error, 1))
 
 	s.lgr.Debug("creating consumer")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
@@ -299,16 +299,16 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		done := false
 
 		select {
-		case closeErr := <-close:
+		case closeErr := <-closeNotification:
 			s.lgr.Error("Server closed", closeErr)
 			done = true
 		case <-ctx.Done():
 			s.lgr.Debug("task processing stopped")
 			done = true
 		case msg = <-taskPool:
-			s.lgr.Debug("received a task to process", util.Object{"msgID", msg.MessageId})
+			s.lgr.Debug("received a task to process", util.Object{Key: "msgID", Val: msg.MessageId})
 		case err := <-errCh:
-			s.lgr.Error("got error in task", err.err, util.Object{"ID", err.taskID})
+			s.lgr.Error("got error in task", err.err, util.Object{Key: "ID", Val: err.taskID})
 			s.taskRep.UpdateTaskStatus(err.taskID, err.status, err.err)
 			continue
 		}
@@ -357,7 +357,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		go func(wrkr *worker, msg *amqp.Delivery) {
 			defer wg.Done()
 
-			s.lgr.Info("processing task", util.Object{"taskName", wrkr.taskName}, util.Object{"taskID", taskID})
+			s.lgr.Info("processing task", util.Object{Key: "taskName", Val: wrkr.taskName}, util.Object{Key: "taskID", Val: taskID})
 			startAt := time.Now()
 			if err := wrkr.process(msg); err != nil {
 				errCh <- errorTaskBody{
@@ -400,10 +400,10 @@ func (s *Server) setConsumer(ctx context.Context, chnl *amqp.Channel, queue stri
 		for {
 			select {
 			case <-ctx.Done():
-				s.lgr.Debug("queue closing", util.Object{"queue", queue})
+				s.lgr.Debug("queue closing", util.Object{Key: "queue", Val: queue})
 				return
-			case taskPool <- (<-msg):
-				s.lgr.Debug("new task", util.Object{"queue", queue})
+			case taskPool <- <-msg:
+				s.lgr.Debug("new task", util.Object{Key: "queue", Val: queue})
 			}
 		}
 	}()

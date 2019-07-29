@@ -31,8 +31,8 @@ func (s *Task) SetLogger() {
 }
 
 func (s *Task) CloseClients() {
-	s.RedisConn.Close()
-	s.MongoConn.Close()
+	_ = s.RedisConn.Close()
+	_ = s.MongoConn.Close()
 }
 
 type bsonTask struct {
@@ -214,7 +214,7 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 					task.FailError = failError.Error()
 				}
 
-				if errs = s.MongoConn.Update(q, task); err != nil {
+				if err = s.MongoConn.Update(q, task); err != nil {
 					errs = err
 				}
 			}()
@@ -224,7 +224,7 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 			}
 		}
 
-		s.lgr.Error("failed to update task", errs, util.Object{"TaskID", id}, util.Object{"Status", status})
+		s.lgr.Error("failed to update task", errs, util.Object{Key: "TaskID", Val: id}, util.Object{"Status", status})
 	}()
 
 	var errs error
@@ -242,7 +242,7 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 			return
 		}
 
-		if !status.CheckStatusOrder(util.Status(task.Status)) {
+		if !status.CheckStatusOrder(task.Status) {
 			return
 		}
 
@@ -268,7 +268,7 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 	}()
 
 	if errs != nil {
-		s.lgr.Error("failed to update task", errs, util.Object{"TaskID", id}, util.Object{"Status", status})
+		s.lgr.Error("failed to update task", errs, util.Object{Key: "TaskID", Val: id}, util.Object{"Status", status})
 	}
 }
 

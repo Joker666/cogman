@@ -21,7 +21,7 @@ var (
 )
 
 func (p TaskPriority) Valid() bool {
-	return (p == TaskPriorityHigh || p == TaskPriorityLow)
+	return p == TaskPriorityHigh || p == TaskPriorityLow
 }
 
 type Task struct {
