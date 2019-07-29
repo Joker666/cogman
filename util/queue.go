@@ -1,6 +1,9 @@
 package util
 
 const (
-	LowPriorityQueue  = "low_priority_queue"
-	HighPriorityQueue = "high_priority_queue"
+	LowPriorityQueue  string = "low_priority_queue"
+	HighPriorityQueue string = "high_priority_queue"
+
+	QueueModeLazy    string = "lazy"
+	QueueModeDefault string = "default"
 )

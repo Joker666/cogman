@@ -13,15 +13,15 @@ const (
 	StatusSuccess    Status = "success"
 )
 
-type PriorityType string
+type TaskPriority string
 
 var (
-	PriorityTypeHigh PriorityType = "High"
-	PriorityTypeLow  PriorityType = "Low"
+	TaskPriorityHigh TaskPriority = "High"
+	TaskPriorityLow  TaskPriority = "Low"
 )
 
-func (p PriorityType) Valid() bool {
-	return (p == PriorityTypeHigh || p == PriorityTypeLow)
+func (p TaskPriority) Valid() bool {
+	return (p == TaskPriorityHigh || p == TaskPriorityLow)
 }
 
 type Task struct {
@@ -30,7 +30,7 @@ type Task struct {
 	OriginalTaskID string
 	Retry          int
 	Payload        []byte
-	Priority       PriorityType
+	Priority       TaskPriority
 	Status         Status
 	FailError      string
 	Duration       *float64

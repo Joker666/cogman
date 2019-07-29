@@ -1,7 +1,6 @@
 package client
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/Tapfury/cogman/util"
@@ -141,37 +140,6 @@ func (s *Session) SendTask(t util.Task) error {
 	return errs
 }
 
-func (s *Session) GetQueueName(pType util.PriorityType) string {
-	queueType := util.LowPriorityQueue
-	name := ""
-
-	if pType == util.PriorityTypeHigh {
-		queueType = util.HighPriorityQueue
-	}
-
-	for {
-		// TODO: Handle low priority queue
-		queue := getQueueName(queueType, s.getQueueIndex())
-		if _, err := s.EnsureQueue(s.conn, queue); err == nil {
-			name = queue
-			break
-		}
-	}
-
-	return name
-}
-
-func (s *Session) getQueueIndex() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	index := s.queueIndex
-	s.queueIndex++
-	s.queueIndex = s.queueIndex % s.cfg.AMQP.HighPriorityQueueCount
-
-	return index
-}
-
 func (s *Session) retryTask(t util.Task) {
 	task := util.Task{
 		Name:           t.Name,
@@ -184,31 +152,4 @@ func (s *Session) retryTask(t util.Task) {
 	if err := s.SendTask(task); err != nil {
 		s.lgr.Error("failed to retry", err, util.Object{"TaskID", task.TaskID}, util.Object{"OriginalTaskID", task.OriginalTaskID})
 	}
-}
-
-func (s *Session) EnsureQueue(con *amqp.Connection, queue string) (*amqp.Queue, error) {
-	chnl, err := con.Channel()
-	if err != nil {
-		return nil, err
-	}
-
-	defer chnl.Close()
-
-	qu, err := chnl.QueueDeclare(
-		queue,
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &qu, nil
-}
-
-func getQueueName(prefix string, id int) string {
-	return prefix + "_" + strconv.Itoa(id)
 }
