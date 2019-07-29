@@ -109,6 +109,11 @@ func (s *Task) CreateTask(task *util.Task) error {
 	var errs error
 
 	func() {
+		if s.RedisConn == nil {
+			errs = ErrRedisNoConnection
+			return
+		}
+
 		byts, err := json.Marshal(task)
 		if err != nil {
 			errs = err
@@ -126,6 +131,10 @@ func (s *Task) CreateTask(task *util.Task) error {
 }
 
 func (s *Task) GetTask(id string) (*util.Task, error) {
+	if s.RedisConn == nil {
+		return nil, ErrRedisNoConnection
+	}
+
 	byts, err := s.RedisConn.Get(id)
 	if err != nil {
 		return nil, err
@@ -164,10 +173,6 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 	}
 
 	go func() {
-		if s.MongoConn == nil {
-			return
-		}
-
 		var errs error
 
 		q := bson.M{
@@ -180,6 +185,10 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 		for i := 0; i < 6; i++ {
 			time.Sleep(time.Second * time.Duration(numB))
 			numB, numA = nextFibonacciNumber(numA, numB), numB
+
+			if s.MongoConn == nil {
+				return
+			}
 
 			errs = nil
 			func() {
@@ -230,6 +239,11 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 	var errs error
 
 	func() {
+		if s.RedisConn == nil {
+			errs = ErrRedisNoConnection
+			return
+		}
+
 		byts, err := s.RedisConn.Get(id)
 		if err != nil {
 			errs = err
@@ -273,6 +287,10 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 }
 
 func (s *Task) ListByStatusBefore(status util.Status, t time.Time, skip, limit int) ([]*util.Task, error) {
+	if s.MongoConn == nil {
+		return nil, ErrMongoNoConnection
+	}
+
 	q := bson.M{
 		"status": string(status),
 		"created_at": bson.M{
