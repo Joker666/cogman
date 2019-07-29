@@ -107,12 +107,11 @@ func (s *Server) Start() error {
 		s.running = false
 	}()
 
-	// TODO: Handle low priority queue
 	s.lgr.Debug("ensuring queue: ")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
 		queue := formQueueName(util.HighPriorityQueue, i)
 		if err := ensureQueue(s.acon, queue, util.TaskPriorityHigh); err != nil {
-			s.lgr.Error("failed to ensure queue: "+queue, err)
+			s.lgr.Error("failed to ensure queue", err, util.Object{"queue_name", queue})
 			return err
 		}
 
@@ -122,7 +121,7 @@ func (s *Server) Start() error {
 	for i := 0; i < s.cfg.AMQP.LowPriorityQueueCount; i++ {
 		queue := formQueueName(util.LowPriorityQueue, i)
 		if err := ensureQueue(s.acon, queue, util.TaskPriorityLow); err != nil {
-			s.lgr.Error("failed to ensure queue: "+queue, err)
+			s.lgr.Error("failed to ensure queue", err, util.Object{"queue_name", queue})
 			return err
 		}
 
@@ -281,7 +280,6 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 	taskPool := make(chan amqp.Delivery)
 	close := chnl.NotifyClose(make(chan *amqp.Error, 1))
 
-	// TODO: Handle low priority queue
 	s.lgr.Debug("creating consumer")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
 		queue := formQueueName(util.HighPriorityQueue, i)
