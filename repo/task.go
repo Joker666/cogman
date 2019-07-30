@@ -288,7 +288,14 @@ func (s *Task) UpdateRetryCount(id string, count int) {
 		q := bson.M{
 			"task_id": id,
 		}
-		task := &bsonTask{}
+		val := bson.M{
+			"$set": bson.M{
+				"updated_at": time.Now(),
+			},
+			"$inc": bson.M{
+				"retry": count,
+			},
+		}
 
 		numA, numB := int64(0), int64(1)
 
@@ -300,30 +307,14 @@ func (s *Task) UpdateRetryCount(id string, count int) {
 				return
 			}
 
-			errs = nil
-			func() {
-				resp, err := s.MongoConn.Get(q)
-				if err != nil {
-					errs = err
-					return
-				}
-
-				if err := parseTask(resp, task); err != nil {
-					errs = err
-					return
-				}
-
-				task.UpdatedAt = time.Now()
-				task.Retry += count
-
-				if err = s.MongoConn.Update(q, task); err != nil {
-					errs = err
-				}
-			}()
-
+			errs = s.MongoConn.UpdatePartial(q, val)
 			if errs == nil {
-				return
+				break
 			}
+		}
+
+		if errs != nil {
+			s.lgr.Error("failed to update retry count", errs, util.Object{Key: "TaskID", Val: id})
 		}
 	}()
 

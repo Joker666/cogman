@@ -94,9 +94,32 @@ func (s *MongoClient) Update(q, val interface{}) error {
 		return err
 	}
 
-	_, err = col.ReplaceOne(ctx, q, val)
+	resp, err := col.ReplaceOne(ctx, q, val)
 	if err != nil {
 		return err
+	}
+	if resp.MatchedCount == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+func (s *MongoClient) UpdatePartial(q, val interface{}) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	col, err := s.getCollection()
+	if err != nil {
+		return err
+	}
+
+	resp, err := col.UpdateOne(ctx, q, val)
+	if err != nil {
+		return err
+	}
+	if resp.MatchedCount == 0 {
+		return ErrNotFound
 	}
 
 	return nil
