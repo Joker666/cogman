@@ -3,7 +3,6 @@ package repo
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"time"
 
 	"github.com/Tapfury/cogman/infra"
@@ -313,7 +312,7 @@ func (s *Task) UpdateRetryCount(id string, count int) {
 					errs = err
 					return
 				}
-				log.Print(task)
+
 				task.UpdatedAt = time.Now()
 				task.Retry += count
 
@@ -321,7 +320,7 @@ func (s *Task) UpdateRetryCount(id string, count int) {
 					errs = err
 				}
 			}()
-			log.Print(errs)
+
 			if errs == nil {
 				return
 			}
