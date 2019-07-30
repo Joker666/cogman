@@ -32,9 +32,11 @@ type Task struct {
 
 type Client struct {
 	ConnectionTimeout time.Duration
+	RequestTimeout    time.Duration
 
-	RequestTimeout time.Duration
-	AMQP           AMQP
-	Redis          Redis
-	Mongo          Mongo
+	AMQP  AMQP
+	Redis Redis
+	Mongo Mongo
+
+	ReEnqueue bool
 }
