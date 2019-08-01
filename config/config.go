@@ -3,6 +3,8 @@ package config
 import "time"
 
 type Server struct {
+	ConnectionTimeout time.Duration
+
 	Mongo Mongo
 	Redis Redis
 	AMQP  AMQP
