@@ -10,6 +10,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Task struct {
@@ -151,6 +152,17 @@ func nextFibonacciNumber(numberA, numberB int64) int64 {
 	return numberA + numberB
 }
 
+func parseTask(resp *mongo.SingleResult, task *bsonTask) error {
+	if err := resp.Decode(task); err != nil {
+		return err
+	}
+	if task == nil {
+		return ErrTaskNotFound
+	}
+
+	return nil
+}
+
 func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface{}) {
 	var failError error
 	var duration *float64
@@ -198,13 +210,8 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 					return
 				}
 
-				if err := resp.Decode(task); err != nil {
+				if err := parseTask(resp, task); err != nil {
 					errs = err
-					return
-				}
-
-				if task == nil {
-					errs = ErrTaskNotFound
 					return
 				}
 
@@ -217,9 +224,6 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 				task.Duration = duration
 				task.FailError = ""
 				if failError != nil {
-					if task.Retry > 0 {
-						task.Retry--
-					}
 					task.FailError = failError.Error()
 				}
 
@@ -244,14 +248,8 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 			return
 		}
 
-		byts, err := s.RedisConn.Get(id)
+		task, err := s.GetTask(id)
 		if err != nil {
-			errs = err
-			return
-		}
-
-		task := util.Task{}
-		if err := json.Unmarshal(byts, &task); err != nil {
 			errs = err
 			return
 		}
@@ -265,13 +263,10 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 		task.Duration = duration
 		task.FailError = ""
 		if failError != nil {
-			if task.Retry > 0 {
-				task.Retry--
-			}
 			task.FailError = failError.Error()
 		}
 
-		byts, err = json.Marshal(task)
+		byts, err := json.Marshal(task)
 		if err != nil {
 			errs = err
 			return
@@ -283,6 +278,74 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 
 	if errs != nil {
 		s.lgr.Error("failed to update task", errs, util.Object{Key: "TaskID", Val: id}, util.Object{"Status", status})
+	}
+}
+
+func (s *Task) UpdateRetryCount(id string, count int) {
+	go func() {
+		var errs error
+
+		q := bson.M{
+			"task_id": id,
+		}
+		val := bson.M{
+			"$set": bson.M{
+				"updated_at": time.Now(),
+			},
+			"$inc": bson.M{
+				"retry": count,
+			},
+		}
+
+		numA, numB := int64(0), int64(1)
+
+		for i := 0; i < 6; i++ {
+			time.Sleep(time.Second * time.Duration(numB))
+			numB, numA = nextFibonacciNumber(numA, numB), numB
+
+			if s.MongoConn == nil {
+				return
+			}
+
+			errs = s.MongoConn.UpdatePartial(q, val)
+			if errs == nil {
+				break
+			}
+		}
+
+		if errs != nil {
+			s.lgr.Error("failed to update retry count", errs, util.Object{Key: "TaskID", Val: id})
+		}
+	}()
+
+	var errs error
+
+	func() {
+		if s.RedisConn == nil {
+			errs = ErrRedisNoConnection
+			return
+		}
+
+		task, err := s.GetTask(id)
+		if err != nil {
+			errs = err
+			return
+		}
+
+		task.UpdatedAt = time.Now()
+		task.Retry += count
+
+		byts, err := json.Marshal(task)
+		if err != nil {
+			errs = err
+			return
+		}
+
+		errs = s.RedisConn.Update(task.TaskID, byts)
+	}()
+
+	if errs != nil {
+		s.lgr.Error("failed to update retry count", errs, util.Object{Key: "TaskID", Val: id})
 	}
 }
 

@@ -40,4 +40,6 @@ type Client struct {
 	AMQP  AMQP
 	Redis Redis
 	Mongo Mongo
+
+	ReEnqueue bool
 }

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Tapfury/cogman/client"
 	"github.com/Tapfury/cogman/config"
 	"github.com/Tapfury/cogman/infra"
 	"github.com/Tapfury/cogman/repo"
@@ -25,9 +26,10 @@ type Server struct {
 	mu      sync.Mutex
 	running bool
 
-	cfg     *config.Server
-	taskRep *repo.Task
-	acon    *amqp.Connection
+	cfg       *config.Server
+	taskRep   *repo.Task
+	acon      *amqp.Connection
+	retryConn *client.Session
 
 	workers map[string]*worker
 
@@ -55,6 +57,21 @@ func NewServer(cfg config.Server) (*Server, error) {
 	}
 
 	return srvr, nil
+}
+
+func newRetryClient(cfg *config.Server) (*client.Session, error) {
+	clntCfg := config.Client{
+		ConnectionTimeout: time.Minute * 5, // Need to change
+		RequestTimeout:    time.Second * 5, // Need to change
+
+		AMQP:  cfg.AMQP,
+		Mongo: cfg.Mongo,
+		Redis: cfg.Redis,
+
+		ReEnqueue: false,
+	}
+
+	return client.NewSession(clntCfg)
 }
 
 func (s *Server) Register(taskName string, h Handler) error {
@@ -106,6 +123,7 @@ func (s *Server) Start() error {
 	defer func() {
 		s.lgr.Debug("closing connections")
 		s.taskRep.CloseClients()
+		s.retryConn.Close()
 		_ = s.acon.Close()
 		s.running = false
 	}()
@@ -231,6 +249,18 @@ func (s *Server) bootstrap() error {
 		return err
 	}
 
+	retryConn, err := newRetryClient(s.cfg)
+	if err != nil {
+		return err
+	}
+	s.lgr.Debug("retry session stablished")
+	s.retryConn = retryConn
+
+	if err := s.retryConn.Connect(); err != nil {
+		return err
+	}
+	s.lgr.Debug("retry session connected")
+
 	return nil
 }
 
@@ -240,9 +270,8 @@ func (s *Server) connect() error {
 		return err
 	}
 
-	s.reconn = acon.NotifyClose(make(chan *amqp.Error, 1))
 	s.acon = acon
-
+	s.reconn = acon.NotifyClose(make(chan *amqp.Error, 1))
 	return nil
 }
 
