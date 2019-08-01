@@ -112,6 +112,13 @@ func (s *Session) Connect() error {
 		_ = s.handleReconnect()
 	}()
 
+
+	s.reEnqueue() // Re enqueue un handles tasks
+
+	return nil
+}
+
+func (s *Session) reEnqueue () {
 	if s.cfg.ReEnqueue {
 		if s.taskRepo.MongoConn == nil {
 			s.lgr.Warn("Failed to re-enqueue task. Mongo connection missing")
@@ -124,8 +131,6 @@ func (s *Session) Connect() error {
 			}()
 		}
 	}
-
-	return nil
 }
 
 func (s *Session) connect(ctx context.Context) error {
@@ -184,6 +189,7 @@ func (s *Session) handleReconnect() error {
 			case <-time.After(100 * time.Millisecond):
 			}
 			if err = s.connect(ctx); err == nil {
+				s.reEnqueue() // Re enqueue un handles tasks
 				break
 			}
 		}

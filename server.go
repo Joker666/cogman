@@ -326,9 +326,15 @@ func (s *Server) handleReconnect() error {
 		s.lgr.Info("Trying to reconnect")
 		s.running = false
 
-		done := time.After(s.cfg.ConnectionTimeout)
-		ctx, cancel := context.WithTimeout(context.Background(), s.cfg.ConnectionTimeout)
-		defer cancel()
+		done := (<-chan time.Time)(make(chan time.Time))
+		ctx := context.Background()
+		cancel := context.CancelFunc(func() {})
+
+		if s.cfg.ConnectionTimeout != 0 {
+			done = time.After(s.cfg.ConnectionTimeout)
+			ctx, cancel = context.WithTimeout(context.Background(), s.cfg.ConnectionTimeout)
+			defer cancel()
+		}
 
 		for {
 			select {
@@ -341,6 +347,8 @@ func (s *Server) handleReconnect() error {
 				break
 			}
 		}
+
+		cancel()
 
 		s.lgr.Info("Reconnection successful")
 		s.running = true
