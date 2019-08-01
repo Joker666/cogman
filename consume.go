@@ -58,7 +58,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		queue := formQueueName(util.LowPriorityQueue, i)
 		s.setConsumer(ctx, chnl, queue, util.QueueModeLazy, taskPool)
 	}
- 
+
 	wg := sync.WaitGroup{}
 	var closeErr error
 
@@ -68,17 +68,32 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		done := false
 
 		select {
-		case closeErr = <-closeNotification:
-			s.lgr.Error("Channel closed", closeErr)
+		case closeErr := <-closeNotification:
+			s.lgr.Error("Server closed", closeErr)
 			done = true
 		case <-ctx.Done():
 			s.lgr.Debug("task processing stopped")
 			done = true
 		case msg = <-taskPool:
 			s.lgr.Debug("received a task to process", util.Object{Key: "msgID", Val: msg.MessageId})
-		case err := <-errCh:
-			s.lgr.Error("got error in task", err.err, util.Object{Key: "ID", Val: err.taskID})
-			s.taskRep.UpdateTaskStatus(err.taskID, err.status, err.err)
+		case errTask := <-errCh:
+			s.lgr.Error("got error in task", errTask.err, util.Object{Key: "ID", Val: errTask.taskID})
+			func() {
+				task, err := s.taskRep.GetTask(errTask.taskID)
+				if err != nil {
+					s.lgr.Error("failed to get task", err, util.Object{Key: "TaskID", Val: errTask.taskID})
+					return
+				}
+
+				if orgTask, err := s.taskRep.GetTask(task.OriginalTaskID); err != nil {
+					s.lgr.Error("failed to get task", err, util.Object{Key: "TaskID", Val: orgTask.TaskID})
+					return
+				} else if orgTask.Retry != 0 {
+					go s.retryConn.RetryTask(*orgTask)
+				}
+			}()
+
+			s.taskRep.UpdateTaskStatus(errTask.taskID, errTask.status, errTask.err)
 			continue
 		}
 
