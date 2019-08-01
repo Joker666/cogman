@@ -3,6 +3,9 @@ package config
 import "time"
 
 type Server struct {
+	ConnectionTimeout time.Duration
+	RequestTimeout    time.Duration
+
 	Mongo Mongo
 	Redis Redis
 	AMQP  AMQP
@@ -32,9 +35,9 @@ type Task struct {
 
 type Client struct {
 	ConnectionTimeout time.Duration
+	RequestTimeout    time.Duration
 
-	RequestTimeout time.Duration
-	AMQP           AMQP
-	Redis          Redis
-	Mongo          Mongo
+	AMQP  AMQP
+	Redis Redis
+	Mongo Mongo
 }

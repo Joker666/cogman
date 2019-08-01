@@ -34,6 +34,7 @@ type Server struct {
 	lgr util.Logger
 
 	quit, done chan struct{}
+	reconn     chan *amqp.Error
 }
 
 func NewServer(cfg config.Server) (*Server, error) {
@@ -49,6 +50,8 @@ func NewServer(cfg config.Server) (*Server, error) {
 		tasks:   map[string]Handler{},
 		workers: map[string]*worker{},
 		lgr:     util.NewLogger(),
+
+		taskRep: &repo.Task{},
 	}
 
 	return srvr, nil
@@ -214,14 +217,6 @@ func (s *Server) bootstrap() error {
 		mcl = con
 	}
 
-	s.lgr.Debug("dialing amqp", util.Object{Key: "uri", Val: s.cfg.AMQP.URI})
-	acl, err := amqp.Dial(s.cfg.AMQP.URI)
-	if err != nil {
-		s.lgr.Error("failed amqp dial", err)
-		return err
-	}
-	s.acon = acl
-
 	rcon := infra.NewRedisClient(s.cfg.Redis.URI)
 	s.lgr.Debug("pinging redis", util.Object{Key: "uri", Val: s.cfg.Redis.URI})
 	if err := rcon.Ping(); err != nil {
@@ -229,6 +224,24 @@ func (s *Server) bootstrap() error {
 	}
 
 	s.taskRep = repo.NewTaskRepo(rcon, mcl)
+
+	s.lgr.Debug("dialing amqp", util.Object{Key: "uri", Val: s.cfg.AMQP.URI})
+	if err := s.connect(); err != nil {
+		s.lgr.Error("failed amqp dial", err)
+		return err
+	}
+
+	return nil
+}
+
+func (s *Server) connect() error {
+	acon, err := amqp.Dial(s.cfg.AMQP.URI)
+	if err != nil {
+		return err
+	}
+
+	s.reconn = acon.NotifyClose(make(chan *amqp.Error, 1))
+	s.acon = acon
 
 	return nil
 }
@@ -252,161 +265,41 @@ func (s *Server) Stop() error {
 	return nil
 }
 
-type errorTaskBody struct {
-	taskID string
-	status util.Status
-	err    error
-}
-
-func (s *Server) consume(ctx context.Context, prefetch int) error {
-	errCh := make(chan errorTaskBody, 1)
-
-	s.lgr.Debug("creating channel")
-
-	chnl, err := s.acon.Channel()
-	if err != nil {
-		s.lgr.Error("failed to create channel", err)
-		return err
-	}
-
-	defer chnl.Close()
-
-	s.lgr.Debug("setting channel qos")
-	if err := chnl.Qos(prefetch, 0, false); err != nil {
-		s.lgr.Error("failed to set qos", err)
-		return err
-	}
-
-	taskPool := make(chan amqp.Delivery)
-	closeNotification := chnl.NotifyClose(make(chan *amqp.Error, 1))
-
-	s.lgr.Debug("creating consumer")
-	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
-		queue := formQueueName(util.HighPriorityQueue, i)
-		s.setConsumer(ctx, chnl, queue, util.QueueModeDefault, taskPool)
-	}
-
-	for i := 0; i < s.cfg.AMQP.LowPriorityQueueCount; i++ {
-		queue := formQueueName(util.LowPriorityQueue, i)
-		s.setConsumer(ctx, chnl, queue, util.QueueModeLazy, taskPool)
-	}
-
-	wg := sync.WaitGroup{}
-
+func (s *Server) handleReconnect() error {
+	var err error
 	for {
-		var msg amqp.Delivery
-
-		done := false
-
 		select {
-		case closeErr := <-closeNotification:
-			s.lgr.Error("Server closed", closeErr)
-			done = true
-		case <-ctx.Done():
-			s.lgr.Debug("task processing stopped")
-			done = true
-		case msg = <-taskPool:
-			s.lgr.Debug("received a task to process", util.Object{Key: "msgID", Val: msg.MessageId})
-		case err := <-errCh:
-			s.lgr.Error("got error in task", err.err, util.Object{Key: "ID", Val: err.taskID})
-			s.taskRep.UpdateTaskStatus(err.taskID, err.status, err.err)
-			continue
+		case <-s.done:
+			return nil
+		case err = <-s.reconn:
+			s.running = false
 		}
 
-		if done {
-			break
-		}
+		done := (<-chan time.Time)(make(chan time.Time))
+		ctx := context.Background()
+		cancel := context.CancelFunc(func() {})
 
-		// TODO: retry task if fail. value will be send by header
-
-		hdr := msg.Headers
-		if hdr == nil {
-			s.lgr.Warn("skipping headless task")
-			continue
-		}
-
-		taskID, ok := hdr["TaskID"].(string)
-		if !ok {
-			s.lgr.Warn("skipping unidentified task")
-			continue
-		}
-
-		s.taskRep.UpdateTaskStatus(taskID, util.StatusInProgress)
-
-		taskName, ok := hdr["TaskName"].(string)
-		if !ok {
-			errCh <- errorTaskBody{
-				taskID,
-				util.StatusFailed,
-				ErrTaskUnidentified,
-			}
-			continue
-		}
-
-		wrkr, ok := s.workers[taskName]
-		if !ok {
-			errCh <- errorTaskBody{
-				taskID,
-				util.StatusFailed,
-				ErrTaskUnhandled,
-			}
-			continue
-		}
-
-		wg.Add(1)
-		go func(wrkr *worker, msg *amqp.Delivery) {
-			defer wg.Done()
-
-			s.lgr.Info("processing task", util.Object{Key: "taskName", Val: wrkr.taskName}, util.Object{Key: "taskID", Val: taskID})
-			startAt := time.Now()
-			if err := wrkr.process(msg); err != nil {
-				errCh <- errorTaskBody{
-					taskID,
-					util.StatusFailed,
-					err,
-				}
-				return
-			}
-			duration := float64(time.Since(startAt)) / float64(time.Minute)
-
-			s.taskRep.UpdateTaskStatus(taskID, util.StatusSuccess, duration)
-
-		}(wrkr, &msg)
-	}
-
-	wg.Wait()
-
-	return err
-}
-
-func (s *Server) setConsumer(ctx context.Context, chnl *amqp.Channel, queue string, mode string, taskPool chan<- amqp.Delivery) {
-	go func() {
-		msg, err := chnl.Consume(
-			queue,
-			"",
-			true,
-			false,
-			false,
-			false,
-			amqp.Table{
-				"x-queue-mode": mode,
-			},
-		)
-		if err != nil {
-			s.lgr.Error("failed to create consumer", err)
-			return
+		if s.cfg.ConnectionTimeout != 0 {
+			done = time.After(s.cfg.ConnectionTimeout)
+			ctx, cancel = context.WithTimeout(context.Background(), s.cfg.ConnectionTimeout)
+			defer cancel()
 		}
 
 		for {
 			select {
-			case <-ctx.Done():
-				s.lgr.Debug("queue closing", util.Object{Key: "queue", Val: queue})
-				return
-			case taskPool <- <-msg:
-				s.lgr.Debug("new task", util.Object{Key: "queue", Val: queue})
+			case <-done:
+				return err
+			case <-time.After(100 * time.Millisecond):
+			}
+			if err = s.connect(ctx); err == nil {
+				break
 			}
 		}
-	}()
+
+		cancel()
+
+		s.running = true
+	}
 }
 
 func formQueueName(prefix string, id int) string {
