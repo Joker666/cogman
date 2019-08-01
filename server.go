@@ -64,6 +64,8 @@ func newRetryClient(cfg *config.Server) (*client.Session, error) {
 		AMQP:  cfg.AMQP,
 		Mongo: cfg.Mongo,
 		Redis: cfg.Redis,
+
+		ReEnqueue: false,
 	}
 
 	return client.NewSession(clntCfg)
