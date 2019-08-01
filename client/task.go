@@ -74,7 +74,10 @@ func (s *Session) SendTask(t util.Task) error {
 	publish := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
 	publishErr := make(chan error, 1)
 
-	Queue := s.GetQueueName(t.Priority)
+	Queue, err := s.GetQueueName(t.Priority)
+	if err != nil {
+		return err
+	}
 
 	go func() {
 		err := ch.Publish(
@@ -124,23 +127,21 @@ func (s *Session) SendTask(t util.Task) error {
 	}
 
 	if errs != nil {
-		orgTask, err := s.taskRepo.GetTask(t.OriginalTaskID)
-		if err != nil {
+		if orgTask, err := s.taskRepo.GetTask(t.OriginalTaskID); err != nil {
 			s.lgr.Error("failed to get task", err, util.Object{Key: "TaskID", Val: t.OriginalTaskID})
-		} else {
-			s.taskRepo.UpdateTaskStatus(t.TaskID, util.StatusFailed, errs)
-			if orgTask.Retry != 0 {
-				go func() {
-					s.retryTask(t)
-				}()
-			}
+		} else if orgTask.Retry != 0 {
+			go func() {
+				s.RetryTask(t)
+			}()
 		}
+
+		s.taskRepo.UpdateTaskStatus(t.TaskID, util.StatusFailed, errs)
 	}
 
 	return errs
 }
 
-func (s *Session) retryTask(t util.Task) {
+func (s *Session) RetryTask(t util.Task) {
 	task := util.Task{
 		Name:           t.Name,
 		OriginalTaskID: t.OriginalTaskID,
@@ -149,6 +150,7 @@ func (s *Session) retryTask(t util.Task) {
 		Status:         util.StatusRetry,
 	}
 
+	s.taskRepo.UpdateRetryCount(t.OriginalTaskID, -1)
 	if err := s.SendTask(task); err != nil {
 		s.lgr.Error("failed to retry", err, util.Object{Key: "TaskID", Val: task.TaskID}, util.Object{"OriginalTaskID", task.OriginalTaskID})
 	}

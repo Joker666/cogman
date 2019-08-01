@@ -112,13 +112,17 @@ func (s *Session) Connect() error {
 		_ = s.handleReconnect()
 	}()
 
-	if s.taskRepo.MongoConn != nil {
-		nw := time.Now()
-		go func() {
-			if err := s.ReEnqueueUnhandledTasksBefore(nw); err != nil {
-				s.lgr.Error("Error in re-enqueuing: ", err)
-			}
-		}()
+	if s.cfg.ReEnqueue {
+		if s.taskRepo.MongoConn == nil {
+			s.lgr.Warn("Failed to re-enqueue task. Mongo connection missing")
+		} else {
+			nw := time.Now()
+			go func() {
+				if err := s.ReEnqueueUnhandledTasksBefore(nw); err != nil {
+					s.lgr.Error("Error in re-enqueuing: ", err)
+				}
+			}()
+		}
 	}
 
 	return nil

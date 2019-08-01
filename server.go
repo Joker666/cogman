@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Tapfury/cogman/client"
 	"github.com/Tapfury/cogman/config"
 	"github.com/Tapfury/cogman/infra"
 	"github.com/Tapfury/cogman/repo"
@@ -25,9 +26,10 @@ type Server struct {
 	mu      sync.Mutex
 	running bool
 
-	cfg     *config.Server
-	taskRep *repo.Task
-	acon    *amqp.Connection
+	cfg       *config.Server
+	taskRep   *repo.Task
+	acon      *amqp.Connection
+	retryConn *client.Session
 
 	workers map[string]*worker
 
@@ -52,6 +54,21 @@ func NewServer(cfg config.Server) (*Server, error) {
 	}
 
 	return srvr, nil
+}
+
+func newRetryClient(cfg *config.Server) (*client.Session, error) {
+	clntCfg := config.Client{
+		ConnectionTimeout: time.Minute * 5, // Need to change
+		RequestTimeout:    time.Second * 5, // Need to change
+
+		AMQP:  cfg.AMQP,
+		Mongo: cfg.Mongo,
+		Redis: cfg.Redis,
+
+		ReEnqueue: false,
+	}
+
+	return client.NewSession(clntCfg)
 }
 
 func (s *Server) Register(taskName string, h Handler) error {
@@ -103,6 +120,7 @@ func (s *Server) Start() error {
 	defer func() {
 		s.lgr.Debug("closing connections")
 		s.taskRep.CloseClients()
+		s.retryConn.Close()
 		_ = s.acon.Close()
 		s.running = false
 	}()
@@ -230,6 +248,18 @@ func (s *Server) bootstrap() error {
 
 	s.taskRep = repo.NewTaskRepo(rcon, mcl)
 
+	retryConn, err := newRetryClient(s.cfg)
+	if err != nil {
+		return err
+	}
+	s.lgr.Debug("retry session stablished")
+	s.retryConn = retryConn
+
+	if err := s.retryConn.Connect(); err != nil {
+		return err
+	}
+	s.lgr.Debug("retry session connected")
+
 	return nil
 }
 
@@ -307,9 +337,26 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			done = true
 		case msg = <-taskPool:
 			s.lgr.Debug("received a task to process", util.Object{Key: "msgID", Val: msg.MessageId})
-		case err := <-errCh:
-			s.lgr.Error("got error in task", err.err, util.Object{Key: "ID", Val: err.taskID})
-			s.taskRep.UpdateTaskStatus(err.taskID, err.status, err.err)
+		case errTask := <-errCh:
+			s.lgr.Error("got error in task", errTask.err, util.Object{Key: "ID", Val: errTask.taskID})
+			func() {
+				task, err := s.taskRep.GetTask(errTask.taskID)
+				if err != nil {
+					s.lgr.Error("failed to get task", err, util.Object{Key: "TaskID", Val: errTask.taskID})
+					return
+				}
+
+				if orgTask, err := s.taskRep.GetTask(task.OriginalTaskID); err != nil {
+					s.lgr.Error("failed to get task", err, util.Object{Key: "TaskID", Val: orgTask.TaskID})
+					return
+				} else if orgTask.Retry != 0 {
+					go func() {
+						s.retryConn.RetryTask(*orgTask)
+					}()
+				}
+			}()
+
+			s.taskRep.UpdateTaskStatus(errTask.taskID, errTask.status, errTask.err)
 			continue
 		}
 

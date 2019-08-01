@@ -9,4 +9,5 @@ var (
 	ErrInvalidConfig     = errors.New("cogman: invalid client config")
 	ErrRequestTimeout    = errors.New("cogman: request timeout")
 	ErrConnectionTimeout = errors.New("cogman: connection timeout")
+	ErrQueueNotAvailable = errors.New("cogman: queue not available")
 )
