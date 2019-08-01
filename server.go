@@ -35,8 +35,9 @@ type Server struct {
 
 	lgr util.Logger
 
-	quit, done chan struct{}
-	connError  chan error
+	quit, done, reconnDone chan struct{}
+
+	connError chan error
 }
 
 func NewServer(cfg config.Server) (*Server, error) {
@@ -49,10 +50,11 @@ func NewServer(cfg config.Server) (*Server, error) {
 	}
 
 	srvr := &Server{
-		cfg:       &cfg,
-		quit:      make(chan struct{}),
-		done:      make(chan struct{}),
-		connError: make(chan error, 1),
+		cfg:        &cfg,
+		quit:       make(chan struct{}),
+		done:       make(chan struct{}),
+		reconnDone: make(chan struct{}),
+		connError:  make(chan error, 1),
 
 		tasks:   map[string]Handler{},
 		workers: map[string]*worker{},
@@ -300,6 +302,8 @@ func (s *Server) Stop() error {
 	}
 
 	s.quit <- struct{}{}
+	s.reconnDone <- struct{}{}
+
 	<-s.done
 
 	s.lgr.Info("server stopped")
@@ -311,7 +315,7 @@ func (s *Server) handleReconnect() error {
 	var err error
 	for {
 		select {
-		case <-s.done:
+		case <-s.reconnDone:
 			return nil
 		case err = <-s.connError:
 			s.lgr.Error("Error in consummer", err)
