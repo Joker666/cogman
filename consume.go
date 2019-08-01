@@ -10,6 +10,16 @@ import (
 	"github.com/streadway/amqp"
 )
 
+func (s *Server) Consume(prefetch int) {
+	ctx, stop := context.WithCancel(context.Background())
+
+	if err := s.consume(ctx, prefetch); err != nil {
+		s.connError <- err
+	}
+
+	stop()
+}
+
 type errorTaskBody struct {
 	taskID string
 	status util.Status
@@ -48,8 +58,9 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		queue := formQueueName(util.LowPriorityQueue, i)
 		s.setConsumer(ctx, chnl, queue, util.QueueModeLazy, taskPool)
 	}
-
+ 
 	wg := sync.WaitGroup{}
+	var closeErr error
 
 	for {
 		var msg amqp.Delivery
@@ -57,8 +68,8 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		done := false
 
 		select {
-		case closeErr := <-closeNotification:
-			s.lgr.Error("Server closed", closeErr)
+		case closeErr = <-closeNotification:
+			s.lgr.Error("Channel closed", closeErr)
 			done = true
 		case <-ctx.Done():
 			s.lgr.Debug("task processing stopped")
@@ -74,8 +85,6 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		if done {
 			break
 		}
-
-		// TODO: retry task if fail. value will be send by header
 
 		hdr := msg.Headers
 		if hdr == nil {
@@ -134,7 +143,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 
 	wg.Wait()
 
-	return err
+	return closeErr
 }
 
 func (s *Server) setConsumer(ctx context.Context, chnl *amqp.Channel, queue string, mode string, taskPool chan<- amqp.Delivery) {

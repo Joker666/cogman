@@ -4,7 +4,6 @@ import "time"
 
 type Server struct {
 	ConnectionTimeout time.Duration
-	RequestTimeout    time.Duration
 
 	Mongo Mongo
 	Redis Redis
