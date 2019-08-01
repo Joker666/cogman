@@ -130,7 +130,7 @@ func (s *Server) Start() error {
 	defer func() {
 		s.lgr.Debug("closing connections")
 		s.taskRep.CloseClients()
-		s.retryConn.Close()
+		_ = s.retryConn.Close()
 		_ = s.acon.Close()
 		s.running = false
 	}()
@@ -160,7 +160,9 @@ func (s *Server) Start() error {
 
 	s.lgr.Info("server started")
 
-	go s.handleReconnect()
+	go func() {
+		_ = s.handleReconnect()
+	}()
 
 	<-s.quit
 
@@ -251,7 +253,7 @@ func (s *Server) bootstrap() error {
 	if err != nil {
 		return err
 	}
-	s.lgr.Debug("retry session stablished")
+	s.lgr.Debug("retry session established")
 	s.retryConn = retryConn
 
 	if err := s.retryConn.Connect(); err != nil {
@@ -318,7 +320,7 @@ func (s *Server) handleReconnect() error {
 		case <-s.reconnDone:
 			return nil
 		case err = <-s.connError:
-			s.lgr.Error("Error in consummer", err)
+			s.lgr.Error("Error in consumer", err)
 		}
 
 		s.lgr.Info("Trying to reconnect")
@@ -326,6 +328,7 @@ func (s *Server) handleReconnect() error {
 
 		done := time.After(s.cfg.ConnectionTimeout)
 		ctx, cancel := context.WithTimeout(context.Background(), s.cfg.ConnectionTimeout)
+		defer cancel()
 
 		for {
 			select {
@@ -338,8 +341,6 @@ func (s *Server) handleReconnect() error {
 				break
 			}
 		}
-
-		cancel()
 
 		s.lgr.Info("Reconnection successful")
 		s.running = true
