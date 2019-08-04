@@ -44,17 +44,17 @@ func main() {
 		return
 	}
 
-	task, err := getMulTask(5, 10)
+	task, err := getMultiplicationTask(5, 10)
 	if err == nil {
 		sendTask(task)
 	}
 
-	task, err = getSubTask(123, 456)
+	task, err = getSubtractionTask(123, 456)
 	if err == nil {
 		sendTask(task)
 	}
 
-	task, err = getMulTask(7, 21)
+	task, err = getAdditionTask(7, 21)
 	if err == nil {
 		sendTask(task)
 	}
@@ -80,7 +80,7 @@ func sendTask(t *util.Task) {
 	log.Print(t.Name, " send successfully")
 }
 
-func getSumTask(numA, numB int) (*util.Task, error) {
+func getAdditionTask(numA, numB int) (*util.Task, error) {
 	body := exampletasks.TaskBody{
 		Num1: numA,
 		Num2: numB,
@@ -102,7 +102,7 @@ func getSumTask(numA, numB int) (*util.Task, error) {
 	return task, nil
 }
 
-func getSubTask(numA, numB int) (*util.Task, error) {
+func getSubtractionTask(numA, numB int) (*util.Task, error) {
 	body := exampletasks.TaskBody{
 		Num1: numA,
 		Num2: numB,
@@ -124,7 +124,7 @@ func getSubTask(numA, numB int) (*util.Task, error) {
 	return task, nil
 }
 
-func getMulTask(numA, numB int) (*util.Task, error) {
+func getMultiplicationTask(numA, numB int) (*util.Task, error) {
 	body := exampletasks.TaskBody{
 		Num1: numA,
 		Num2: numB,

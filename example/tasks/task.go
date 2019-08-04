@@ -16,13 +16,8 @@ func TaskList() []string {
 		TaskErrorGenerator,
 	}
 }
- 
+
 type TaskBody struct {
 	Num1 int
 	Num2 int
 }
-
-type ErrorTaskBody struct {
-	RetryCount int
-}
-
