@@ -242,7 +242,6 @@ func (s *Server) bootstrap() error {
 
 	ctx := context.Background()
 	cancel := context.CancelFunc(func() {})
-	defer cancel()
 
 	if s.cfg.ConnectionTimeout != 0 {
 		ctx, cancel = context.WithTimeout(context.Background(), s.cfg.ConnectionTimeout)

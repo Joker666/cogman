@@ -62,7 +62,8 @@ func main() {
 		return
 	}
 
-	srv.Start()
 	log.Print("waiting for task...")
+	srv.Start()
+
 	defer srv.Stop()
 }
