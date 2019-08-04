@@ -21,7 +21,7 @@ type Session struct {
 	connected bool
 
 	conn     *amqp.Connection
-	taskRepo *repo.Task
+	taskRepo *repo.TaskRepository
 
 	done   chan struct{}
 	reconn chan *amqp.Error
@@ -43,6 +43,8 @@ func NewSession(cfg config.Client) (*Session, error) {
 			util.QueueModeLazy:    0,
 			util.QueueModeDefault: 0,
 		},
+
+		taskRepo: &repo.TaskRepository{},
 	}, nil
 }
 
@@ -89,8 +91,6 @@ func (s *Session) Connect() error {
 
 	s.taskRepo = repo.NewTaskRepo(rcon, mcon)
 
-	s.taskRepo.SetLogger()
-
 	s.done = make(chan struct{})
 
 	ctx := context.Background()
@@ -112,25 +112,27 @@ func (s *Session) Connect() error {
 		_ = s.handleReconnect()
 	}()
 
-
 	s.reEnqueue() // Re enqueue un handles tasks
 
 	return nil
 }
 
-func (s *Session) reEnqueue () {
-	if s.cfg.ReEnqueue {
-		if s.taskRepo.MongoConn == nil {
-			s.lgr.Warn("Failed to re-enqueue task. Mongo connection missing")
-		} else {
-			nw := time.Now()
-			go func() {
-				if err := s.ReEnqueueUnhandledTasksBefore(nw); err != nil {
-					s.lgr.Error("Error in re-enqueuing: ", err)
-				}
-			}()
-		}
+func (s *Session) reEnqueue() {
+	if !s.cfg.ReEnqueue {
+		return
 	}
+
+	if s.taskRepo.MongoConn == nil {
+		s.lgr.Warn("Failed to re-enqueue task. Mongo connection missing")
+		return
+	}
+
+	nw := time.Now()
+	go func() {
+		if err := s.ReEnqueueUnhandledTasksBefore(nw); err != nil {
+			s.lgr.Error("Error in re-enqueuing: ", err)
+		}
+	}()
 }
 
 func (s *Session) connect(ctx context.Context) error {
