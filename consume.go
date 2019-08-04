@@ -79,13 +79,13 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		case errTask := <-errCh:
 			s.lgr.Error("got error in task", errTask.err, util.Object{Key: "ID", Val: errTask.taskID})
 			func() {
-				task, err := s.taskRep.GetTask(errTask.taskID)
+				task, err := s.taskRepo.GetTask(errTask.taskID)
 				if err != nil {
 					s.lgr.Error("failed to get task", err, util.Object{Key: "TaskID", Val: errTask.taskID})
 					return
 				}
 
-				if orgTask, err := s.taskRep.GetTask(task.OriginalTaskID); err != nil {
+				if orgTask, err := s.taskRepo.GetTask(task.OriginalTaskID); err != nil {
 					s.lgr.Error("failed to get task", err, util.Object{Key: "TaskID", Val: orgTask.TaskID})
 					return
 				} else if orgTask.Retry != 0 {
@@ -93,7 +93,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 				}
 			}()
 
-			s.taskRep.UpdateTaskStatus(errTask.taskID, errTask.status, errTask.err)
+			s.taskRepo.UpdateTaskStatus(errTask.taskID, errTask.status, errTask.err)
 			continue
 		}
 
@@ -113,7 +113,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			continue
 		}
 
-		s.taskRep.UpdateTaskStatus(taskID, util.StatusInProgress)
+		s.taskRepo.UpdateTaskStatus(taskID, util.StatusInProgress)
 
 		taskName, ok := hdr["TaskName"].(string)
 		if !ok {
@@ -151,7 +151,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			}
 			duration := float64(time.Since(startAt)) / float64(time.Minute)
 
-			s.taskRep.UpdateTaskStatus(taskID, util.StatusSuccess, duration)
+			s.taskRepo.UpdateTaskStatus(taskID, util.StatusSuccess, duration)
 
 		}(wrkr, &msg)
 	}

@@ -13,25 +13,23 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type Task struct {
+type TaskRepository struct {
 	RedisConn *infra.RedisClient
 	MongoConn *infra.MongoClient
 
 	lgr util.Logger
 }
 
-func NewTaskRepo(redisCon *infra.RedisClient, mgoCon *infra.MongoClient) *Task {
-	return &Task{
+func NewTaskRepo(redisCon *infra.RedisClient, mgoCon *infra.MongoClient) *TaskRepository {
+	return &TaskRepository{
 		RedisConn: redisCon,
 		MongoConn: mgoCon,
+
+		lgr: util.NewLogger(),
 	}
 }
 
-func (s *Task) SetLogger() {
-	s.lgr = util.NewLogger()
-}
-
-func (s *Task) CloseClients() {
+func (s *TaskRepository) CloseClients() {
 	_ = s.RedisConn.Close()
 	_ = s.MongoConn.Close()
 }
@@ -82,7 +80,7 @@ func formTask(t *bsonTask) *util.Task {
 	}
 }
 
-func (s *Task) CreateTask(task *util.Task) error {
+func (s *TaskRepository) CreateTask(task *util.Task) error {
 	if task.Status != util.StatusRetry {
 		task.Status = util.StatusInitiated
 	}
@@ -131,7 +129,7 @@ func (s *Task) CreateTask(task *util.Task) error {
 	return errs
 }
 
-func (s *Task) GetTask(id string) (*util.Task, error) {
+func (s *TaskRepository) GetTask(id string) (*util.Task, error) {
 	if s.RedisConn == nil {
 		return nil, ErrRedisNoConnection
 	}
@@ -163,7 +161,7 @@ func parseTask(resp *mongo.SingleResult, task *bsonTask) error {
 	return nil
 }
 
-func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface{}) {
+func (s *TaskRepository) UpdateTaskStatus(id string, status util.Status, args ...interface{}) {
 	var failError error
 	var duration *float64
 
@@ -281,7 +279,7 @@ func (s *Task) UpdateTaskStatus(id string, status util.Status, args ...interface
 	}
 }
 
-func (s *Task) UpdateRetryCount(id string, count int) {
+func (s *TaskRepository) UpdateRetryCount(id string, count int) {
 	go func() {
 		var errs error
 
@@ -349,7 +347,7 @@ func (s *Task) UpdateRetryCount(id string, count int) {
 	}
 }
 
-func (s *Task) ListByStatusBefore(status util.Status, t time.Time, skip, limit int) ([]*util.Task, error) {
+func (s *TaskRepository) ListByStatusBefore(status util.Status, t time.Time, skip, limit int) ([]*util.Task, error) {
 	if s.MongoConn == nil {
 		return nil, ErrMongoNoConnection
 	}

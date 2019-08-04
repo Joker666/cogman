@@ -27,7 +27,7 @@ type Server struct {
 	running bool
 
 	cfg       *config.Server
-	taskRep   *repo.Task
+	taskRepo  *repo.TaskRepository
 	acon      *amqp.Connection
 	retryConn *client.Session
 
@@ -60,7 +60,7 @@ func NewServer(cfg config.Server) (*Server, error) {
 		workers: map[string]*worker{},
 		lgr:     util.NewLogger(),
 
-		taskRep: &repo.Task{},
+		taskRepo: &repo.TaskRepository{},
 	}
 
 	return srvr, nil
@@ -129,7 +129,7 @@ func (s *Server) Start() error {
 
 	defer func() {
 		s.lgr.Debug("closing connections")
-		s.taskRep.CloseClients()
+		s.taskRepo.CloseClients()
 		s.retryConn.Close()
 		_ = s.acon.Close()
 		s.running = false
@@ -236,7 +236,7 @@ func (s *Server) bootstrap() error {
 		s.lgr.Error("failed redis ping", err)
 	}
 
-	s.taskRep = repo.NewTaskRepo(rcon, mcl)
+	s.taskRepo = repo.NewTaskRepo(rcon, mcl)
 
 	ctx, cancel := context.WithTimeout(context.Background(), s.cfg.ConnectionTimeout)
 	defer cancel()

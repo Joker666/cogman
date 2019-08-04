@@ -21,7 +21,7 @@ type Session struct {
 	connected bool
 
 	conn     *amqp.Connection
-	taskRepo *repo.Task
+	taskRepo *repo.TaskRepository
 
 	done   chan struct{}
 	reconn chan *amqp.Error
@@ -43,6 +43,8 @@ func NewSession(cfg config.Client) (*Session, error) {
 			util.QueueModeLazy:    0,
 			util.QueueModeDefault: 0,
 		},
+
+		taskRepo: &repo.TaskRepository{},
 	}, nil
 }
 
@@ -88,8 +90,6 @@ func (s *Session) Connect() error {
 	}
 
 	s.taskRepo = repo.NewTaskRepo(rcon, mcon)
-
-	s.taskRepo.SetLogger()
 
 	s.done = make(chan struct{})
 
