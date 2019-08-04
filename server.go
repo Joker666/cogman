@@ -45,8 +45,8 @@ func NewServer(cfg config.Server) (*Server, error) {
 		return nil, ErrNoTask
 	}
 
-	if cfg.ConnectionTimeout <= 0 {
-		cfg.ConnectionTimeout = time.Minute * 10
+	if cfg.ConnectionTimeout < 0 {
+		return nil, ErrInvalidConfig
 	}
 
 	srvr := &Server{
