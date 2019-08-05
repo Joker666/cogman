@@ -240,8 +240,13 @@ func (s *Server) bootstrap() error {
 
 	s.taskRepo = repo.NewTaskRepo(rcon, mcl)
 
-	ctx, cancel := context.WithTimeout(context.Background(), s.cfg.ConnectionTimeout)
-	defer cancel()
+	ctx := context.Background()
+	cancel := context.CancelFunc(func() {})
+
+	if s.cfg.ConnectionTimeout != 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), s.cfg.ConnectionTimeout)
+		defer cancel()
+	}
 
 	s.lgr.Debug("dialing amqp", util.Object{Key: "uri", Val: s.cfg.AMQP.URI})
 	if err := s.connect(ctx); err != nil {
@@ -249,14 +254,17 @@ func (s *Server) bootstrap() error {
 		return err
 	}
 
+	s.lgr.Info("getting retry session")
 	retryConn, err := newRetryClient(s.cfg)
 	if err != nil {
+		s.lgr.Error("failed get retry session", err)
 		return err
 	}
 	s.lgr.Debug("retry session established")
 	s.retryConn = retryConn
 
 	if err := s.retryConn.Connect(); err != nil {
+		s.lgr.Error("failed connect retry session", err)
 		return err
 	}
 	s.lgr.Debug("retry session connected")
