@@ -136,12 +136,12 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		}
 
 		wg.Add(1)
-		go func(wrkr *worker, msg *amqp.Delivery) {
+		go func(wrkr *util.Worker, msg *amqp.Delivery) {
 			defer wg.Done()
 
-			s.lgr.Info("processing task", util.Object{Key: "taskName", Val: wrkr.taskName}, util.Object{Key: "taskID", Val: taskID})
+			s.lgr.Info("processing task", util.Object{Key: "taskName", Val: wrkr.Name()}, util.Object{Key: "taskID", Val: taskID})
 			startAt := time.Now()
-			if err := wrkr.process(msg); err != nil {
+			if err := wrkr.Process(msg); err != nil {
 				errCh <- errorTaskBody{
 					taskID,
 					util.StatusFailed,

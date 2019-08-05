@@ -15,12 +15,8 @@ import (
 	"github.com/streadway/amqp"
 )
 
-type Handler interface {
-	Do(ctx context.Context, payload []byte) error
-}
-
 type Server struct {
-	tasks map[string]Handler
+	tasks map[string]util.Handler
 	tmu   sync.RWMutex
 
 	mu      sync.Mutex
@@ -31,7 +27,7 @@ type Server struct {
 	acon      *amqp.Connection
 	retryConn *client.Session
 
-	workers map[string]*worker
+	workers map[string]*util.Worker
 
 	lgr util.Logger
 
@@ -56,8 +52,8 @@ func NewServer(cfg config.Server) (*Server, error) {
 		reconnDone: make(chan struct{}),
 		connError:  make(chan error, 1),
 
-		tasks:   map[string]Handler{},
-		workers: map[string]*worker{},
+		tasks:   map[string]util.Handler{},
+		workers: map[string]*util.Worker{},
 		lgr:     util.NewLogger(),
 
 		taskRepo: &repo.TaskRepository{},
@@ -81,28 +77,27 @@ func newRetryClient(cfg *config.Server) (*client.Session, error) {
 	return client.NewSession(clntCfg)
 }
 
-func (s *Server) Register(taskName string, h Handler) error {
-	s.lgr.Debug("registering task " + taskName)
+func (s *Server) Register(taskName string, h util.Handler) error {
+	s.lgr.Debug("registering task ", util.Object{Key: "TaskName", Val: taskName})
 
 	s.tmu.Lock()
 	defer s.tmu.Unlock()
 
 	if _, ok := s.tasks[taskName]; ok {
-		s.lgr.Error("duplicate task "+taskName, ErrDuplicateTaskName)
+		s.lgr.Error("duplicate task ", ErrDuplicateTaskName, util.Object{Key: "TaskName", Val: taskName})
 		return ErrDuplicateTaskName
 	}
 	s.tasks[taskName] = h
 
-	s.lgr.Info("registered task " + taskName)
-
+	s.lgr.Info("registered task ", util.Object{Key: "TaskName", Val: taskName})
 	return nil
 }
 
-func (s *Server) GetTaskHandler(taskName string) Handler {
+func (s *Server) GetTaskHandler(taskName string) util.Handler {
 	s.tmu.RLock()
 	defer s.tmu.RUnlock()
 
-	s.lgr.Debug("getting task " + taskName)
+	s.lgr.Debug("getting task ", util.Object{Key: "TaskName", Val: taskName})
 	return s.tasks[taskName]
 }
 
@@ -208,10 +203,7 @@ func (s *Server) bootstrap() error {
 		if !ok {
 			return TaskHandlerMissingError(t.Name)
 		}
-		wrkr := &worker{
-			taskName: t.Name,
-			handler:  h,
-		}
+		wrkr := util.NewWorker(t.Name, h)
 
 		s.workers[t.Name] = wrkr
 	}

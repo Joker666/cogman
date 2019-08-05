@@ -1,4 +1,4 @@
-package cogman
+package util
 
 import (
 	"context"
@@ -6,12 +6,27 @@ import (
 	"github.com/streadway/amqp"
 )
 
-type worker struct {
+type Worker struct {
 	taskName string
 	handler  Handler
 }
 
-func (w *worker) process(msg *amqp.Delivery) error {
+type Handler interface {
+	Do(ctx context.Context, payload []byte) error
+}
+
+func NewWorker(name string, h Handler) *Worker {
+	return &Worker{
+		taskName: name,
+		handler:  h,
+	}
+}
+
+func (w *Worker) Name() string {
+	return w.taskName
+}
+
+func (w *Worker) Process(msg *amqp.Delivery) error {
 	h := Header{}
 	for k, v := range msg.Headers {
 		if s, ok := v.(string); ok {
