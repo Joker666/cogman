@@ -1,4 +1,4 @@
-package cogman
+package util
 
 import (
 	"context"
