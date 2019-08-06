@@ -46,7 +46,11 @@ func StartBackground(cfg *config.Config) error {
 }
 
 func SendTask(task util.Task, hdlr util.Handler) error {
-	_ = srvr.Register(task.Name, hdlr)
+	if hdlr != nil {
+		if err := srvr.Register(task.Name, hdlr); err != nil {
+			return err
+		}
+	}
 
 	return clnt.SendTask(task)
 }
