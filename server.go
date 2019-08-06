@@ -15,15 +15,10 @@ import (
 	"github.com/streadway/amqp"
 )
 
-type Handler interface {
-	Do(ctx context.Context, payload []byte) error
-}
-
 type Server struct {
-	tasks map[string]Handler
-	tmu   sync.RWMutex
+	tmu sync.RWMutex
+	mu  sync.Mutex
 
-	mu      sync.Mutex
 	running bool
 
 	cfg       *config.Server
@@ -31,7 +26,7 @@ type Server struct {
 	acon      *amqp.Connection
 	retryConn *client.Session
 
-	workers map[string]*worker
+	workers map[string]*util.Worker
 
 	lgr util.Logger
 
@@ -41,10 +36,6 @@ type Server struct {
 }
 
 func NewServer(cfg config.Server) (*Server, error) {
-	if len(cfg.Tasks) == 0 {
-		return nil, ErrNoTask
-	}
-
 	if cfg.ConnectionTimeout < 0 {
 		return nil, ErrInvalidConfig
 	}
@@ -56,8 +47,7 @@ func NewServer(cfg config.Server) (*Server, error) {
 		reconnDone: make(chan struct{}),
 		connError:  make(chan error, 1),
 
-		tasks:   map[string]Handler{},
-		workers: map[string]*worker{},
+		workers: map[string]*util.Worker{},
 		lgr:     util.NewLogger(),
 
 		taskRepo: &repo.TaskRepository{},
@@ -81,29 +71,29 @@ func newRetryClient(cfg *config.Server) (*client.Session, error) {
 	return client.NewSession(clntCfg)
 }
 
-func (s *Server) Register(taskName string, h Handler) error {
-	s.lgr.Debug("registering task " + taskName)
+func (s *Server) Register(taskName string, h util.Handler) error {
+	s.lgr.Debug("registering task ", util.Object{Key: "TaskName", Val: taskName})
 
 	s.tmu.Lock()
 	defer s.tmu.Unlock()
 
-	if _, ok := s.tasks[taskName]; ok {
-		s.lgr.Error("duplicate task "+taskName, ErrDuplicateTaskName)
+	if _, ok := s.workers[taskName]; ok {
+		s.lgr.Error("duplicate task ", ErrDuplicateTaskName, util.Object{Key: "TaskName", Val: taskName})
 		return ErrDuplicateTaskName
 	}
-	s.tasks[taskName] = h
 
-	s.lgr.Info("registered task " + taskName)
+	s.workers[taskName] = util.NewWorker(taskName, h)
 
+	s.lgr.Info("registered task ", util.Object{Key: "TaskName", Val: taskName})
 	return nil
 }
 
-func (s *Server) GetTaskHandler(taskName string) Handler {
+func (s *Server) GetTaskHandler(taskName string) util.Handler {
 	s.tmu.RLock()
 	defer s.tmu.RUnlock()
 
-	s.lgr.Debug("getting task " + taskName)
-	return s.tasks[taskName]
+	s.lgr.Debug("getting task ", util.Object{Key: "TaskName", Val: taskName})
+	return s.workers[taskName].Handler()
 }
 
 func (s *Server) Start() error {
@@ -202,20 +192,6 @@ func ensureQueue(con *amqp.Connection, queue string, taskType util.TaskPriority)
 }
 
 func (s *Server) bootstrap() error {
-	s.lgr.Debug("initializing workers")
-	for _, t := range s.cfg.Tasks {
-		h, ok := s.tasks[t.Name]
-		if !ok {
-			return TaskHandlerMissingError(t.Name)
-		}
-		wrkr := &worker{
-			taskName: t.Name,
-			handler:  h,
-		}
-
-		s.workers[t.Name] = wrkr
-	}
-
 	var mcl *infra.MongoClient
 	if s.cfg.Mongo.URI != "" {
 		s.lgr.Debug("connecting mongodb", util.Object{Key: "uri", Val: s.cfg.Mongo.URI})
