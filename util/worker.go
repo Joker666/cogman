@@ -26,6 +26,10 @@ func (w *Worker) Name() string {
 	return w.taskName
 }
 
+func (w *Worker) Handler() Handler {
+	return w.handler
+}
+
 func (w *Worker) Process(msg *amqp.Delivery) error {
 	h := Header{}
 	for k, v := range msg.Headers {

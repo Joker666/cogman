@@ -16,10 +16,9 @@ import (
 )
 
 type Server struct {
-	tasks map[string]util.Handler
-	tmu   sync.RWMutex
+	tmu sync.RWMutex
+	mu  sync.Mutex
 
-	mu      sync.Mutex
 	running bool
 
 	cfg       *config.Server
@@ -37,10 +36,6 @@ type Server struct {
 }
 
 func NewServer(cfg config.Server) (*Server, error) {
-	if len(cfg.Tasks) == 0 {
-		return nil, ErrNoTask
-	}
-
 	if cfg.ConnectionTimeout < 0 {
 		return nil, ErrInvalidConfig
 	}
@@ -52,7 +47,6 @@ func NewServer(cfg config.Server) (*Server, error) {
 		reconnDone: make(chan struct{}),
 		connError:  make(chan error, 1),
 
-		tasks:   map[string]util.Handler{},
 		workers: map[string]*util.Worker{},
 		lgr:     util.NewLogger(),
 
@@ -83,11 +77,12 @@ func (s *Server) Register(taskName string, h util.Handler) error {
 	s.tmu.Lock()
 	defer s.tmu.Unlock()
 
-	if _, ok := s.tasks[taskName]; ok {
+	if _, ok := s.workers[taskName]; ok {
 		s.lgr.Error("duplicate task ", ErrDuplicateTaskName, util.Object{Key: "TaskName", Val: taskName})
 		return ErrDuplicateTaskName
 	}
-	s.tasks[taskName] = h
+
+	s.workers[taskName] = util.NewWorker(taskName, h)
 
 	s.lgr.Info("registered task ", util.Object{Key: "TaskName", Val: taskName})
 	return nil
@@ -98,7 +93,7 @@ func (s *Server) GetTaskHandler(taskName string) util.Handler {
 	defer s.tmu.RUnlock()
 
 	s.lgr.Debug("getting task ", util.Object{Key: "TaskName", Val: taskName})
-	return s.tasks[taskName]
+	return s.workers[taskName].Handler()
 }
 
 func (s *Server) Start() error {
@@ -197,17 +192,6 @@ func ensureQueue(con *amqp.Connection, queue string, taskType util.TaskPriority)
 }
 
 func (s *Server) bootstrap() error {
-	s.lgr.Debug("initializing workers")
-	for _, t := range s.cfg.Tasks {
-		h, ok := s.tasks[t.Name]
-		if !ok {
-			return TaskHandlerMissingError(t.Name)
-		}
-		wrkr := util.NewWorker(t.Name, h)
-
-		s.workers[t.Name] = wrkr
-	}
-
 	var mcl *infra.MongoClient
 	if s.cfg.Mongo.URI != "" {
 		s.lgr.Debug("connecting mongodb", util.Object{Key: "uri", Val: s.cfg.Mongo.URI})
