@@ -48,13 +48,13 @@ func main() {
 	cogman.Register(exampletasks.TaskAddition, exampletasks.NewSumTask())
 	cogman.Register(exampletasks.TaskSubtraction, exampletasks.NewSubTask())
 
-	task, err := exampletasks.getAdditionTask(9, 9)
+	task, err := exampletasks.GetAdditionTask(9, 9)
 	if err != nil {
 		log.Fatal(err)
 	}
 	cogman.SendTask(*task, nil)
 
-	task, err = exampletasks.getSubtractionTask(10, 100)
+	task, err = exampletasks.GetSubtractionTask(10, 100)
 	if err != nil {
 		log.Fatal(err)
 	}
