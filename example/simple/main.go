@@ -6,34 +6,26 @@ import (
 
 	"github.com/Tapfury/cogman"
 	exampletasks "github.com/Tapfury/cogman/example/tasks"
-	grmon "github.com/bcicen/grmon/agent"
 )
 
 func main() {
-	grmon.Start()
 
 	cfg := getConfig()
 
-	/*
-		StartBackgroud will initiate a client & a server together.
-		Both end will retry if a task fails.
-
-		Task will be re-enqueued (ReEnqueue: true) from client end
-		if for any reason client can not deliver it to amqp.
-	*/
+	// StartBackgroud will initiate a client & a server together.
+	// Both end will retry if a task fails.
+	// Task will be re-enqueued (ReEnqueue: true) from client end
+	// if for any reason client can not deliver it to amqp.
 
 	log.Print("initiate client & server together")
 	if err := cogman.StartBackground(cfg); err != nil {
 		log.Fatal(err)
 	}
 
-	/*
-		Send task required a task signature and a handler.
-		If a task register by a handler, it can use it
-		later without sending along with task
-
-		task can be register before hand using register api.
-	*/
+	// Send task required a task signature and a handler.
+	// If a task register by a handler, task with same name can
+	// use that handler without sending it again.
+	// task can be register before hand using register api.
 
 	task, err := getMultiplicationTask(21, 7)
 	if err != nil {
