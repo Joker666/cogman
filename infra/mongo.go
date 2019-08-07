@@ -2,6 +2,7 @@ package infra
 
 import (
 	"context"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -15,11 +16,12 @@ const (
 )
 
 type MongoClient struct {
-	URL string
-	mcl *mongo.Client
+	URL    string
+	ExpDur int32
+	mcl    *mongo.Client
 }
 
-func NewMongoClient(url string) (*MongoClient, error) {
+func NewMongoClient(url string, ttl time.Duration) (*MongoClient, error) {
 	conn, err := mongo.Connect(
 		context.Background(),
 		options.Client().ApplyURI(url),
@@ -30,13 +32,36 @@ func NewMongoClient(url string) (*MongoClient, error) {
 	}
 
 	return &MongoClient{
-		URL: url,
-		mcl: conn,
+		URL:    url,
+		ExpDur: int32(ttl.Seconds()),
+		mcl:    conn,
 	}, nil
 }
 
 func (s *MongoClient) Ping() error {
 	return s.mcl.Ping(context.Background(), readpref.Primary())
+}
+
+func (s *MongoClient) SetTTL() (interface{}, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	col, err := s.getCollection()
+	if err != nil {
+		return nil, err
+	}
+
+	opts := &options.IndexOptions{}
+	opts.SetExpireAfterSeconds(s.ExpDur)
+
+	model := mongo.IndexModel{
+		Keys: bson.D{
+			bson.E{"created_at", 1},
+		},
+		Options: opts,
+	}
+
+	return col.Indexes().CreateOne(ctx, model)
 }
 
 func (s *MongoClient) Close() error {
