@@ -67,8 +67,8 @@ func getMultiplicationTask(numA, numB int) (*util.Task, error) {
 	task := &util.Task{
 		Name:     exampletasks.TaskMultiplication,
 		Payload:  pld,
-		Priority: util.TaskPriorityLow,
-		Retry:    2,
+		Priority: util.TaskPriorityHigh,
+		Retry:    0,
 	}
 
 	return task, nil

@@ -4,13 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+
+	"github.com/Tapfury/cogman/util"
 )
 
 type SumTask struct {
 	Name string
 }
 
-func NewSumTask() SumTask {
+func NewSumTask() util.Handler {
 	return SumTask{
 		Name: TaskAddition,
 	}

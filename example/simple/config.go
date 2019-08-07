@@ -8,5 +8,7 @@ func getConfig() *config.Config {
 	return &config.Config{
 		AmqpURI:  "amqp://localhost:5672",
 		RedisURI: "redis://localhost:6379/0",
+
+		ReEnqueue: true,
 	}
 }

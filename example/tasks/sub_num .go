@@ -4,13 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+
+	"github.com/Tapfury/cogman/util"
 )
 
 type SubTask struct {
 	Name string
 }
 
-func NewSubTask() SubTask {
+func NewSubTask() util.Handler {
 	return SubTask{
 		TaskSubtraction,
 	}
