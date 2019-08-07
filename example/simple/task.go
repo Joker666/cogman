@@ -30,28 +30,6 @@ func getAdditionTask(numA, numB int) (*util.Task, error) {
 	return task, nil
 }
 
-func getSubtractionTask(numA, numB int) (*util.Task, error) {
-	body := exampletasks.TaskBody{
-		Num1: numA,
-		Num2: numB,
-	}
-
-	pld, err := parseBody(body)
-	if err != nil {
-		log.Print("Parse: ", err)
-		return nil, err
-	}
-
-	task := &util.Task{
-		Name:     exampletasks.TaskSubtraction,
-		Payload:  pld,
-		Priority: util.TaskPriorityLow,
-		Retry:    0,
-	}
-
-	return task, nil
-}
-
 func getMultiplicationTask(numA, numB int) (*util.Task, error) {
 	body := exampletasks.TaskBody{
 		Num1: numA,
