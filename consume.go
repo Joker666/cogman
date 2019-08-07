@@ -10,8 +10,8 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func (s *Server) Consume(prefetch int) {
-	ctx, stop := context.WithCancel(context.Background())
+func (s *Server) Consume(ctx context.Context, prefetch int) {
+	ctx, stop := context.WithCancel(ctx)
 
 	if err := s.consume(ctx, prefetch); err != nil {
 		s.connError <- err
