@@ -9,7 +9,7 @@ import (
 )
 
 type SumTask struct {
-	Name string
+	Name string 
 }
 
 func NewSumTask() util.Handler {

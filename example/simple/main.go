@@ -26,7 +26,7 @@ func main() {
 	// If a task register by a handler, task with same name can
 	// use that handler without sending it again.
 
-	task, err := getMultiplicationTask(21, 7)
+	task, err := exampletasks.GetMultiplicationTask(21, 7)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	task, err = getAdditionTask(12, 31)
+	task, err = exampletasks.GetAdditionTask(12, 31)
 	if err != nil {
 		log.Fatal(err)
 	}
