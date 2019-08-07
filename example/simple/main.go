@@ -13,9 +13,9 @@ func main() {
 	cfg := getConfig()
 
 	// StartBackgroud will initiate a client & a server together.
-	// Both end will retry if a task fails.
-	// Task will be re-enqueued (ReEnqueue: true) from client end
-	// if for any reason client can not deliver it to amqp.
+	// Both client & server will retry if a task fails.
+	// Task will be re-enqueued (ReEnqueue: true) from client
+	// if client can not deliver it to amqp for any issues.
 
 	log.Print("initiate client & server together")
 	if err := cogman.StartBackground(cfg); err != nil {
