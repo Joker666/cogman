@@ -105,10 +105,8 @@ func setConfig(cfg *config.Config) (*config.Server, *config.Client, error) {
 	srvrCfg.Redis = config.Redis{cfg.RedisURI}
 	clntCfg.Redis = config.Redis{cfg.RedisURI}
 
-	if cfg.MongoURI != "" {
-		srvrCfg.Mongo = config.Mongo{cfg.MongoURI}
-		clntCfg.Mongo = config.Mongo{cfg.MongoURI}
-	}
+	srvrCfg.Mongo = config.Mongo{cfg.MongoURI}
+	clntCfg.Mongo = config.Mongo{cfg.MongoURI}
 
 	clntCfg.ReEnqueue = cfg.ReEnqueue
 
