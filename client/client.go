@@ -70,14 +70,14 @@ func (s *Session) Connect() error {
 		return nil
 	}
 
-	rcon := infra.NewRedisClient(s.cfg.Redis.URI)
+	rcon := infra.NewRedisClient(s.cfg.Redis.URI, s.cfg.Redis.TTL)
 	if err := rcon.Ping(); err != nil {
 		return err
 	}
 
 	var mcon *infra.MongoClient
 	if s.cfg.Mongo.URI != "" {
-		con, err := infra.NewMongoClient(s.cfg.Mongo.URI)
+		con, err := infra.NewMongoClient(s.cfg.Mongo.URI, s.cfg.Mongo.TTL)
 		if err != nil {
 			return err
 		}
@@ -87,6 +87,10 @@ func (s *Session) Connect() error {
 		}
 
 		mcon = con
+		_, err = mcon.SetTTL()
+		if err != nil {
+			return err
+		}
 	}
 
 	s.taskRepo = repo.NewTaskRepo(rcon, mcon)

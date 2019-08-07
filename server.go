@@ -195,7 +195,7 @@ func (s *Server) bootstrap() error {
 	var mcl *infra.MongoClient
 	if s.cfg.Mongo.URI != "" {
 		s.lgr.Debug("connecting mongodb", util.Object{Key: "uri", Val: s.cfg.Mongo.URI})
-		con, err := infra.NewMongoClient(s.cfg.Mongo.URI)
+		con, err := infra.NewMongoClient(s.cfg.Mongo.URI, s.cfg.Mongo.TTL)
 		if err != nil {
 			return err
 		}
@@ -206,9 +206,13 @@ func (s *Server) bootstrap() error {
 		}
 
 		mcl = con
+		_, err = mcl.SetTTL()
+		if err != nil {
+			return err
+		}
 	}
 
-	rcon := infra.NewRedisClient(s.cfg.Redis.URI)
+	rcon := infra.NewRedisClient(s.cfg.Redis.URI, s.cfg.Redis.TTL)
 	s.lgr.Debug("pinging redis", util.Object{Key: "uri", Val: s.cfg.Redis.URI})
 	if err := rcon.Ping(); err != nil {
 		s.lgr.Error("failed redis ping", err)
