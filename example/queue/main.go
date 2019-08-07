@@ -12,6 +12,10 @@ import (
 // High priority task will be pushed to high priority queue
 // Number of each type of queue can be configured from config file
 
+// format of queue naming: lazy_priority_queue_*   & high_priority_queue_*
+// specific types of task push to specific type of queue using round robin manner
+// also it check the availability of the queue before pushing a task
+
 func main() {
 
 	cfg := getConfig()
