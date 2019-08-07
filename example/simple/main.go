@@ -5,12 +5,17 @@ import (
 	"time"
 
 	"github.com/Tapfury/cogman"
+	"github.com/Tapfury/cogman/config"
 	exampletasks "github.com/Tapfury/cogman/example/tasks"
 )
 
 func main() {
+    cfg := &config.Config{
+		AmqpURI:  "amqp://localhost:5672",    // required
+		RedisURI: "redis://localhost:6379/0", // required
 
-	cfg := getConfig()
+		ReEnqueue: true, // optional. default false. Mongo connection also needed
+	}
 
 	// StartBackgroud will initiate a client & a server together.
 	// Both client & server will retry if a task fails.
