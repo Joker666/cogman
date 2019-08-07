@@ -7,13 +7,15 @@ import (
 )
 
 type RedisClient struct {
-	URL  string
-	rcon *redis.Pool
+	URL    string
+	rcon   *redis.Pool
+	ExpDur int64
 }
 
-func NewRedisClient(url string) *RedisClient {
+func NewRedisClient(url string, ttl time.Duration) *RedisClient {
 	return &RedisClient{
-		URL: url,
+		URL:    url,
+		ExpDur: int64(ttl.Seconds()),
 		rcon: &redis.Pool{
 			MaxIdle:     5,
 			IdleTimeout: 300 * time.Second,
@@ -59,7 +61,11 @@ func (s *RedisClient) Create(key string, t []byte) error {
 	}
 	defer conn.Close()
 
-	_, err := conn.Do("SET", key, t)
+	if _, err := conn.Do("SET", key, t); err != nil {
+		return err
+	}
+
+	_, err := conn.Do("EXPIRE", key, s.ExpDur)
 	return err
 }
 
@@ -70,6 +76,10 @@ func (s *RedisClient) Update(key string, t []byte) error {
 	}
 	defer conn.Close()
 
-	_, err := conn.Do("SET", key, t)
+	if _, err := conn.Do("SET", key, t); err != nil {
+		return err
+	}
+
+	_, err := conn.Do("EXPIRE", key, s.ExpDur)
 	return err
 }

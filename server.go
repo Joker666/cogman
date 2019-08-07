@@ -208,7 +208,7 @@ func (s *Server) bootstrap() error {
 		mcl = con
 	}
 
-	rcon := infra.NewRedisClient(s.cfg.Redis.URI)
+	rcon := infra.NewRedisClient(s.cfg.Redis.URI, s.cfg.Redis.TTL)
 	s.lgr.Debug("pinging redis", util.Object{Key: "uri", Val: s.cfg.Redis.URI})
 	if err := rcon.Ping(); err != nil {
 		s.lgr.Error("failed redis ping", err)

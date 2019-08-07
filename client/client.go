@@ -70,7 +70,7 @@ func (s *Session) Connect() error {
 		return nil
 	}
 
-	rcon := infra.NewRedisClient(s.cfg.Redis.URI)
+	rcon := infra.NewRedisClient(s.cfg.Redis.URI, s.cfg.Redis.TTL)
 	if err := rcon.Ping(); err != nil {
 		return err
 	}

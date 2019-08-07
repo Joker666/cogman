@@ -94,15 +94,23 @@ func setConfig(cfg *config.Config) (*config.Server, *config.Client, error) {
 		return nil, nil, ErrInvalidConfig
 	}
 
-	srvrCfg.Redis = config.Redis{cfg.RedisURI}
-	clntCfg.Redis = config.Redis{cfg.RedisURI}
+	if cfg.RedisTTL == 0 {
+		cfg.RedisTTL = time.Hour * 24 * 7 // 1 week
+	}
+
+	srvrCfg.Redis = config.Redis{cfg.RedisURI, cfg.RedisTTL}
+	clntCfg.Redis = config.Redis{cfg.RedisURI, cfg.RedisTTL}
 
 	if cfg.MongoURI == "" {
 		cfg.MongoURI = "mongodb://root:secret@localhost:27017"
 	}
 
-	srvrCfg.Mongo = config.Mongo{cfg.MongoURI}
-	clntCfg.Mongo = config.Mongo{cfg.MongoURI}
+	if cfg.MongoTTL == 0 {
+		cfg.MongoTTL = time.Hour * 24 * 30 // 1  month
+	}
+
+	srvrCfg.Mongo = config.Mongo{cfg.MongoURI, cfg.MongoTTL}
+	clntCfg.Mongo = config.Mongo{cfg.MongoURI, cfg.MongoTTL}
 
 	clntCfg.ReEnqueue = cfg.ReEnqueue
 
