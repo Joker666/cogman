@@ -21,8 +21,8 @@ func NewMulTask() util.Handler {
 func (t MulTask) Do(ctx context.Context, payload []byte) error {
 	var body TaskBody
 	if err := json.Unmarshal(payload, &body); err != nil {
-		log.Fatal("Multiplication task process error", err)
-		return nil
+		log.Print("Multiplication task process error", err)
+		return err
 	}
 
 	log.Printf("num1: %d num2: %d mul: %d", body.Num1, body.Num2, body.Num1*body.Num2)
