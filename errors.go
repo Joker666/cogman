@@ -4,6 +4,7 @@ import "errors"
 
 var (
 	ErrRequestTimeout    = errors.New("cogman: request timeout")
+	ErrInvalidData       = errors.New("cogman: invalid data")
 	ErrConnectionTimeout = errors.New("cogman: connection timeout")
 	ErrInvalidConfig     = errors.New("cogman: invalid server config")
 	ErrDuplicateTaskName = errors.New("cogman: duplicate task name")

@@ -3,82 +3,10 @@ package main
 import (
 	"encoding/json"
 	"log"
-	"time"
 
-	"github.com/Tapfury/cogman/client"
-	"github.com/Tapfury/cogman/config"
 	exampletasks "github.com/Tapfury/cogman/example/tasks"
 	"github.com/Tapfury/cogman/util"
 )
-
-var (
-	clnt *client.Session
-)
-
-func main() {
-	cfg := config.Client{
-		ConnectionTimeout: time.Minute * 10,
-		RequestTimeout:    time.Second * 5,
-		AMQP: config.AMQP{
-			URI:                    "amqp://localhost:5672",
-			HighPriorityQueueCount: 5,
-			LowPriorityQueueCount:  5,
-			Exchange:               "",
-		},
-		Mongo: config.Mongo{URI: "mongodb://root:secret@localhost:27017"},
-		Redis: config.Redis{URI: "redis://localhost:6379/0"},
-	}
-
-	var err error
-
-	log.Print("creating new client session")
-	clnt, err = client.NewSession(cfg)
-	if err != nil {
-		log.Print("NewSession: ", err)
-		return
-	}
-
-	log.Print("connecting client")
-	if err := clnt.Connect(); err != nil {
-		log.Print("connect: ", err)
-		return
-	}
-
-	task, err := getMultiplicationTask(5, 10)
-	if err == nil {
-		sendTask(task)
-	}
-
-	task, err = getSubtractionTask(123, 456)
-	if err == nil {
-		sendTask(task)
-	}
-
-	task, err = getAdditionTask(7, 21)
-	if err == nil {
-		sendTask(task)
-	}
-
-	log.Print("closing channel...")
-	close := time.After(time.Second * 5)
-	<-close
-
-	clnt.Close()
-
-	log.Print("channel closed...")
-}
-
-func sendTask(t *util.Task) {
-	log.Print("sending task: ", t.Name)
-
-	err := clnt.SendTask(*t)
-	if err != nil {
-		log.Print("task: ", err)
-		return
-	}
-
-	log.Print(t.Name, " send successfully")
-}
 
 func getAdditionTask(numA, numB int) (*util.Task, error) {
 	body := exampletasks.TaskBody{

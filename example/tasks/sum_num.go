@@ -19,10 +19,9 @@ func NewSumTask() SumTask {
 func (t SumTask) Do(ctx context.Context, payload []byte) error {
 	var body TaskBody
 	if err := json.Unmarshal(payload, &body); err != nil {
-		log.Print("Task process error", err)
-		return nil
+		log.Fatal("Sum task process error", err)
 	}
 
-	log.Print("num1: ", body.Num1, "num2: ", body.Num2, "Sum: ", body.Num1+body.Num2)
+	log.Printf("num1: %d num2: %d sum: %d", body.Num1, body.Num2, body.Num1+body.Num2)
 	return nil
 }
