@@ -10,6 +10,9 @@ type Config struct {
 	RedisURI string
 	MongoURI string
 
+	RedisTTL time.Duration
+	MongoTTL time.Duration
+
 	HighPriorityQueueCount int
 	LowPriorityQueueCount  int
 
@@ -45,10 +48,12 @@ type AMQP struct {
 
 type Mongo struct {
 	URI string
+	TTL time.Duration
 }
 
 type Redis struct {
 	URI string
+	TTL time.Duration
 }
 
 type Task struct {
