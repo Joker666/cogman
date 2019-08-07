@@ -30,7 +30,7 @@ type Server struct {
 
 	lgr util.Logger
 
-	quit, done, reconnDone chan struct{}
+	quit, done chan struct{}
 
 	connError chan error
 }
@@ -41,11 +41,10 @@ func NewServer(cfg config.Server) (*Server, error) {
 	}
 
 	srvr := &Server{
-		cfg:        &cfg,
-		quit:       make(chan struct{}),
-		done:       make(chan struct{}),
-		reconnDone: make(chan struct{}),
-		connError:  make(chan error, 1),
+		cfg:       &cfg,
+		quit:      make(chan struct{}),
+		done:      make(chan struct{}),
+		connError: make(chan error, 1),
 
 		workers: map[string]*util.Worker{},
 		lgr:     util.NewLogger(),
@@ -146,17 +145,21 @@ func (s *Server) Start() error {
 		s.lgr.Debug(queue + " ensured")
 	}
 
-	go s.Consume(s.cfg.AMQP.Prefetch)
+	ctx, stop := context.WithCancel(context.Background())
+
+	go s.Consume(ctx, s.cfg.AMQP.Prefetch)
 
 	s.lgr.Info("server started")
 
 	go func() {
-		_ = s.handleReconnect()
+		_ = s.handleReconnect(ctx)
 	}()
 
 	<-s.quit
 
 	s.lgr.Debug("found stop signal")
+
+	stop() // stopping reConnection handler & consumer
 
 	s.done <- struct{}{}
 
@@ -292,8 +295,6 @@ func (s *Server) Stop() error {
 	}
 
 	s.quit <- struct{}{}
-	s.reconnDone <- struct{}{}
-
 	<-s.done
 
 	s.lgr.Info("server stopped")
@@ -301,11 +302,12 @@ func (s *Server) Stop() error {
 	return nil
 }
 
-func (s *Server) handleReconnect() error {
+func (s *Server) handleReconnect(ctx context.Context) error {
 	var err error
 	for {
 		select {
-		case <-s.reconnDone:
+		case <-ctx.Done():
+			s.lgr.Warn("Retry stopped")
 			return nil
 		case err = <-s.connError:
 			s.lgr.Error("Error in consumer", err)
@@ -331,7 +333,7 @@ func (s *Server) handleReconnect() error {
 			case <-time.After(100 * time.Millisecond):
 			}
 			if err = s.connect(ctx); err == nil {
-				go s.Consume(s.cfg.AMQP.Prefetch)
+				go s.Consume(ctx, s.cfg.AMQP.Prefetch)
 				break
 			}
 		}
