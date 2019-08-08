@@ -49,17 +49,27 @@ func main() {
 	cogman.Register(exampletasks.TaskAddition, exampletasks.NewSumTask())
 	cogman.Register(exampletasks.TaskSubtraction, exampletasks.NewSubTask())
 
+	time.Sleep(time.Second * 3)
+	log.Print("========================================>")
+
 	task, err := exampletasks.GetAdditionTask(9, 9, util.TaskPriorityHigh, 3)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cogman.SendTask(*task, nil)
+	if err := cogman.SendTask(*task, nil); err != nil {
+		log.Fatal(err)
+	}
+
+	time.Sleep(time.Second * 3)
+	log.Print("========================================>")
 
 	task, err = exampletasks.GetSubtractionTask(10, 100, util.TaskPriorityLow, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cogman.SendTask(*task, nil)
+	if err := cogman.SendTask(*task, nil); err != nil {
+		log.Fatal(err)
+	}
 
 	close()
 }

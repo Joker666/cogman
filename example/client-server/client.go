@@ -40,6 +40,8 @@ func Client() (*cogman.Session, error) {
 }
 
 func SendExampleTask(clnt *cogman.Session) error {
+	log.Printf("========================================>")
+
 	task, err := exampletasks.GetAdditionTask(234, 435, util.TaskPriorityHigh, 3)
 	if err != nil {
 		return err
@@ -48,6 +50,9 @@ func SendExampleTask(clnt *cogman.Session) error {
 		return err
 	}
 
+	time.Sleep(time.Second * 3)
+	log.Print("========================================>")
+
 	task, err = exampletasks.GetSubtractionTask(43, 23, util.TaskPriorityLow, 3)
 	if err != nil {
 		return err
@@ -55,6 +60,9 @@ func SendExampleTask(clnt *cogman.Session) error {
 	if err := clnt.SendTask(*task); err != nil {
 		return err
 	}
+
+	time.Sleep(time.Second * 3)
+	log.Print("========================================>")
 
 	task, err = exampletasks.GetMultiplicationTask(2, 24, util.TaskPriorityHigh, 3)
 	if err != nil {

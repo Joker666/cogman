@@ -28,6 +28,9 @@ func main() {
 		log.Fatal(err)
 	}
 
+	time.Sleep(time.Second * 3)
+	log.Print("========================================>")
+
 	// Send task required a task signature and a handler.
 	// If a task register by a handler, task with same name can
 	// use that handler without sending it again.
@@ -37,7 +40,12 @@ func main() {
 		log.Fatal(err)
 	}
 	handler := exampletasks.NewMulTask()
-	cogman.SendTask(*task, handler)
+	if err := cogman.SendTask(*task, handler); err != nil {
+		log.Fatal(err)
+	}
+
+	time.Sleep(time.Second * 3)
+	log.Print("========================================>")
 
 	// task can be registered before hand using register api.
 	handler = exampletasks.NewSumTask()
@@ -50,7 +58,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	cogman.SendTask(*task, nil)
+	if err := cogman.SendTask(*task, nil); err != nil {
+		log.Fatal(err)
+	}
 
 	close()
 }
