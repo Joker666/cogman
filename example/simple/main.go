@@ -7,10 +7,11 @@ import (
 	"github.com/Tapfury/cogman"
 	"github.com/Tapfury/cogman/config"
 	exampletasks "github.com/Tapfury/cogman/example/tasks"
+	"github.com/Tapfury/cogman/util"
 )
 
 func main() {
-    cfg := &config.Config{
+	cfg := &config.Config{
 		AmqpURI:  "amqp://localhost:5672",    // required
 		RedisURI: "redis://localhost:6379/0", // required
 
@@ -31,7 +32,7 @@ func main() {
 	// If a task register by a handler, task with same name can
 	// use that handler without sending it again.
 
-	task, err := exampletasks.GetMultiplicationTask(21, 7)
+	task, err := exampletasks.GetMultiplicationTask(21, 7, util.TaskPriorityLow, 1)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -45,7 +46,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	task, err = exampletasks.GetAdditionTask(12, 31)
+	task, err = exampletasks.GetAdditionTask(12, 31, util.TaskPriorityHigh, 2)
 	if err != nil {
 		log.Fatal(err)
 	}

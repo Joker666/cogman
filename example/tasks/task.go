@@ -1,9 +1,10 @@
 package exampletasks
 
 import (
-	"github.com/Tapfury/cogman/util"
-	"log"
 	"encoding/json"
+	"log"
+
+	"github.com/Tapfury/cogman/util"
 )
 
 // Task list
@@ -28,9 +29,8 @@ type TaskBody struct {
 	Num2 int
 }
 
-
-func GetAdditionTask(numA, numB int) (*util.Task, error) {
-	body :=  TaskBody{
+func GetAdditionTask(numA, numB int, p util.TaskPriority, retryCount int) (*util.Task, error) {
+	body := TaskBody{
 		Num1: numA,
 		Num2: numB,
 	}
@@ -42,17 +42,17 @@ func GetAdditionTask(numA, numB int) (*util.Task, error) {
 	}
 
 	task := &util.Task{
-		Name:      TaskAddition,
+		Name:     TaskAddition,
 		Payload:  pld,
-		Priority: util.TaskPriorityHigh,
-		Retry:    0,
+		Priority: p,
+		Retry:    retryCount,
 	}
 
 	return task, nil
 }
 
-func GetMultiplicationTask(numA, numB int) (*util.Task, error) {
-	body :=  TaskBody{
+func GetMultiplicationTask(numA, numB int, p util.TaskPriority, retryCount int) (*util.Task, error) {
+	body := TaskBody{
 		Num1: numA,
 		Num2: numB,
 	}
@@ -64,17 +64,17 @@ func GetMultiplicationTask(numA, numB int) (*util.Task, error) {
 	}
 
 	task := &util.Task{
-		Name:      TaskMultiplication,
+		Name:     TaskMultiplication,
 		Payload:  pld,
-		Priority: util.TaskPriorityHigh,
-		Retry:    0,
+		Priority: p,
+		Retry:    retryCount,
 	}
 
 	return task, nil
 }
 
-func GetSubtractionTask(numA, numB int) (*util.Task, error) {
-	body :=  TaskBody{
+func GetSubtractionTask(numA, numB int, p util.TaskPriority, retryCount int) (*util.Task, error) {
+	body := TaskBody{
 		Num1: numA,
 		Num2: numB,
 	}
@@ -86,10 +86,10 @@ func GetSubtractionTask(numA, numB int) (*util.Task, error) {
 	}
 
 	task := &util.Task{
-		Name:      TaskSubtraction,
+		Name:     TaskSubtraction,
 		Payload:  pld,
-		Priority: util.TaskPriorityLow,
-		Retry:    1,
+		Priority: p,
+		Retry:    retryCount,
 	}
 
 	return task, nil

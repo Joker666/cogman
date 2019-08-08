@@ -7,6 +7,7 @@ import (
 	"github.com/Tapfury/cogman"
 	"github.com/Tapfury/cogman/config"
 	exampletasks "github.com/Tapfury/cogman/example/tasks"
+	"github.com/Tapfury/cogman/util"
 )
 
 // Low priority task will be pushed to low priority queue
@@ -48,13 +49,13 @@ func main() {
 	cogman.Register(exampletasks.TaskAddition, exampletasks.NewSumTask())
 	cogman.Register(exampletasks.TaskSubtraction, exampletasks.NewSubTask())
 
-	task, err := exampletasks.GetAdditionTask(9, 9)
+	task, err := exampletasks.GetAdditionTask(9, 9, util.TaskPriorityHigh, 3)
 	if err != nil {
 		log.Fatal(err)
 	}
 	cogman.SendTask(*task, nil)
 
-	task, err = exampletasks.GetSubtractionTask(10, 100)
+	task, err = exampletasks.GetSubtractionTask(10, 100, util.TaskPriorityLow, 0)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -1,13 +1,16 @@
 package main
 
 import (
+	"log"
 	"time"
 
-	"github.com/Tapfury/cogman/client"
+	cogman "github.com/Tapfury/cogman/client"
 	"github.com/Tapfury/cogman/config"
+	exampletasks "github.com/Tapfury/cogman/example/tasks"
+	"github.com/Tapfury/cogman/util"
 )
 
-func SetupClient() (*client.Session, error) {
+func Client() (*cogman.Session, error) {
 	cfg := config.Client{
 		ConnectionTimeout: time.Minute * 10,
 		RequestTimeout:    time.Second * 10,
@@ -24,7 +27,7 @@ func SetupClient() (*client.Session, error) {
 		ReEnqueue: true,
 	}
 
-	clnt, err := client.NewSession(cfg)
+	clnt, err := cogman.NewSession(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -34,4 +37,37 @@ func SetupClient() (*client.Session, error) {
 	}
 
 	return clnt, nil
+}
+
+func SendExampleTask(clnt *cogman.Session) error {
+	task, err := exampletasks.GetAdditionTask(234, 435, util.TaskPriorityHigh, 3)
+	if err != nil {
+		return err
+	}
+	if err := clnt.SendTask(*task); err != nil {
+		return err
+	}
+
+	task, err = exampletasks.GetSubtractionTask(43, 23, util.TaskPriorityLow, 3)
+	if err != nil {
+		return err
+	}
+	if err := clnt.SendTask(*task); err != nil {
+		return err
+	}
+
+	task, err = exampletasks.GetMultiplicationTask(2, 24, util.TaskPriorityHigh, 3)
+	if err != nil {
+		return err
+	}
+	if err := clnt.SendTask(*task); err != nil {
+		return err
+	}
+
+	close := time.After(time.Second * 3)
+	<-close
+
+	log.Print("[x] press ctrl + c to terminate the program")
+
+	<-close
 }

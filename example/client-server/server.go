@@ -6,6 +6,7 @@ import (
 
 	"github.com/Tapfury/cogman"
 	"github.com/Tapfury/cogman/config"
+	exampletasks "github.com/Tapfury/cogman/example/tasks"
 )
 
 func SetupServer() (*cogman.Server, error) {
@@ -30,9 +31,18 @@ func SetupServer() (*cogman.Server, error) {
 	go func() {
 		defer srvr.Stop()
 		if err = srvr.Start(); err != nil {
-			log.Print(err)
+			log.Fatal(err)
 		}
 	}()
+
+	// Task handler register
+	srvr.Register(exampletasks.TaskAddition, exampletasks.NewSumTask())
+	srvr.Register(exampletasks.TaskSubtraction, exampletasks.NewSubTask())
+	srvr.Register(exampletasks.TaskMultiplication, exampletasks.NewSubTask())
+
+	log.Print("[x] press ctrl + c to terminate the program")
+	close := make(chan struct{})
+	<-close
 
 	return srvr, nil
 }
