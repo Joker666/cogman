@@ -11,15 +11,15 @@ import (
 
 func main() {
 	cfg := config.Server{
-		ConnectionTimeout: time.Minute * 10,
+		ConnectionTimeout: time.Minute * 10, // default .server will stop trying to reconnection if it is not done within connection timeout
 
-		Mongo: config.Mongo{URI: "mongodb://root:secret@localhost:27017/", TTL: time.Hour},
-		Redis: config.Redis{URI: "redis://localhost:6379/0", TTL: time.Hour},
+		Mongo: config.Mongo{URI: "mongodb://root:secret@localhost:27017/", TTL: time.Hour}, // default
+		Redis: config.Redis{URI: "redis://localhost:6379/0", TTL: time.Hour},               // required
 		AMQP: config.AMQP{
 			URI:                    "amqp://localhost:5672",
-			HighPriorityQueueCount: 5,
-			LowPriorityQueueCount:  5,
-			Exchange:               "",
+			HighPriorityQueueCount: 5,  // default
+			LowPriorityQueueCount:  5,  // default
+			Exchange:               "", // Client and Server exchange should be same
 		},
 	}
 
