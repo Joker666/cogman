@@ -10,7 +10,7 @@ import (
 	"github.com/Tapfury/cogman/util"
 )
 
-func Client() (*cogman.Session, error) {
+func main() {
 	cfg := config.Client{
 		ConnectionTimeout: time.Minute * 10,
 		RequestTimeout:    time.Second * 10,
@@ -29,18 +29,28 @@ func Client() (*cogman.Session, error) {
 
 	clnt, err := cogman.NewSession(cfg)
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
 	}
 
 	if err := clnt.Connect(); err != nil {
-		return nil, err
+		log.Fatal(err)
 	}
 
-	return clnt, nil
+	if err := SendExampleTask(clnt); err != nil {
+		log.Fatal(err)
+	}
+
+	close := time.After(time.Second * 3)
+	<-close
+
+	log.Print("[x] press ctrl + c to terminate the program")
+
+	<-close
 }
 
 func SendExampleTask(clnt *cogman.Session) error {
 	log.Printf("========================================>")
+	time.Sleep(time.Second * 3)
 
 	task, err := exampletasks.GetAdditionTask(234, 435, util.TaskPriorityHigh, 3)
 	if err != nil {
@@ -72,10 +82,5 @@ func SendExampleTask(clnt *cogman.Session) error {
 		return err
 	}
 
-	close := time.After(time.Second * 3)
-	<-close
-
-	log.Print("[x] press ctrl + c to terminate the program")
-
-	<-close
+	return nil
 }

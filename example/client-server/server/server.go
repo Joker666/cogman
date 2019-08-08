@@ -9,7 +9,7 @@ import (
 	exampletasks "github.com/Tapfury/cogman/example/tasks"
 )
 
-func SetupServer() (*cogman.Server, error) {
+func main() {
 	cfg := config.Server{
 		ConnectionTimeout: time.Minute * 10,
 
@@ -25,7 +25,7 @@ func SetupServer() (*cogman.Server, error) {
 
 	srvr, err := cogman.NewServer(cfg)
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
 	}
 
 	go func() {
@@ -43,6 +43,4 @@ func SetupServer() (*cogman.Server, error) {
 	log.Print("[x] press ctrl + c to terminate the program")
 	close := make(chan struct{})
 	<-close
-
-	return srvr, nil
 }
