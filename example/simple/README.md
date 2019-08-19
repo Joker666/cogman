@@ -9,9 +9,10 @@ Congman provide individual api and config method to make it easier to use. Just 
 * [Register API](#register)
 
 #### Config:
-Cogman provide most simplest approach to setup config file. It only ask for `amqp` & `redis` connection address. 
 
-Here `mongo` is optional. But for re-enqueuing task, it's required. Other field will be fill up by default value.
+Cogman provide most simplest approach to setup config file. It only ask for `amqp` & `redis` connection address.
+
+Here `mongo` is optional. But for re-enqueuing task, It's required. Other field will be fill up by default value if they are empty.
 
 ```go
 cfg := &config.Config{
@@ -30,7 +31,7 @@ if err := cogman.StartBackground(cfg); err != nil {
 ```
 
 #### Send Task
-Send task will deliver the task to `amqp`. Task also need a handler to execute that task. Handler can be register individually using [Register](#register) api. Then handler parameter should be `nil`. 
+Send task will deliver the task to `amqp`. Task also need a handler to execute that task. Handler can be register individually using [Register](#register) api. Then handler parameter in `SendTask` should be `nil`.
 
 ```go
 if err := cogman.SendTask(task, handler); err != nil {
@@ -39,7 +40,7 @@ if err := cogman.SendTask(task, handler); err != nil {
 ```
 
 #### Register
-For registering a task handler at any point of the program, register api can be used. `handler` is an interface that only required a `Do` method to implement. 
+For registering a task handler at any point of the program, register api can be used. `handler` is an interface that only required a `Do` method to implement.
 
 ```go
 cogman.Register(exampletasks.TaskAddition, handler)

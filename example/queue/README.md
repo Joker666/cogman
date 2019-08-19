@@ -4,7 +4,7 @@ Cogman sorted the task into two priority.
 ```
 - TaskPriorityHigh  
 - TaskPriorityLow  
-``` 
+```
 
 #### Queue configuration
 ---

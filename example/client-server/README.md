@@ -1,9 +1,10 @@
 ## Server-Client
-Client and server can be initiated individually in Cogman. And any number of cogman client and server can be run in different machine to pull and push task from same source. 
-
+Client and server can be initiated individually in Cogman.
 
 #### Client Example
-For client connection we need a new session. From there we can connect and initiate the queue. It will start re-enqueue and reconnection process.
+Create a new session for making a new client connection. After that initiate the queues. `client.connect` also initiates a re-enqueue process if it gets it from config.
+
+Cogman store task log if somehow `rabbitamq` loss the connection so that they can be re-processed. The moment client re-start, it fetch all the task from `mongo` with status `initiated` and process them again.
 
 ##### config 
 ```go
@@ -23,7 +24,7 @@ cfg := config.Client{
     ReEnqueue: true, // default value false. Mongo connection required if ReEnqueue: true
 }
 ```
-Cogman client follow round robin process to decide in which queue task will be push. 
+Cogman client follow round robin process to decide in which queue task will be pushed. 
 
 ```go
 clnt, err := cogman.NewSession(cfg)
@@ -36,7 +37,7 @@ if err := clnt.Connect(); err != nil {
 }
 ```
 
-For sending task, cogman client has individual method. Before task send, a handler must be registered for the task. 
+Cogman client has individual API for sending task. Each task must a registered task handler. 
 ```go
 if err := clnt.SendTask(task); err != nil {
     return err
@@ -75,7 +76,7 @@ go func() {
 }()
 ```
 
-And also server must register the task handler before start processing them.
+Server must register the task handler before start processing them.
 
 ```go
 srvr.Register(exampletasks.TaskAddition, exampletasks.NewSumTask())
