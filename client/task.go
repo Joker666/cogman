@@ -90,7 +90,7 @@ func (s *Session) SendTask(t util.Task) error {
 					"TaskName": t.Name,
 					"TaskID":   t.TaskID,
 				},
-				Type:         t.Name,
+				MessageId:    t.TaskID,
 				DeliveryMode: amqp.Persistent,
 				Body:         t.Payload,
 			},
