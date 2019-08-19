@@ -32,8 +32,17 @@ type Session struct {
 
 // NewSession creates new client session with config cfg
 func NewSession(cfg config.Client) (*Session, error) {
-	if cfg.ConnectionTimeout < 0 || cfg.RequestTimeout < 0 {
+	if cfg.ConnectionTimeout < 0 || cfg.RequestTimeout < 0 ||
+		cfg.Mongo.TTL < 0 || cfg.Redis.TTL < 0 {
 		return nil, ErrInvalidConfig
+	}
+
+	if cfg.Mongo.TTL == 0 {
+		cfg.Mongo.TTL = time.Hour * 24 * 30 // 1  month
+	}
+
+	if cfg.Redis.TTL == 0 {
+		cfg.Redis.TTL = time.Hour * 24 * 7 // 1 week
 	}
 
 	return &Session{
@@ -94,6 +103,9 @@ func (s *Session) Connect() error {
 	}
 
 	s.taskRepo = repo.NewTaskRepo(rcon, mcon)
+	if err := s.taskRepo.EnsureIndices(); err != nil {
+		return err
+	}
 
 	s.done = make(chan struct{})
 

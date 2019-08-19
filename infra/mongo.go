@@ -51,7 +51,10 @@ func (s *MongoClient) SetTTL() (interface{}, error) {
 		return nil, err
 	}
 
+	col.Indexes().DropOne(ctx, "TTL")
+
 	opts := &options.IndexOptions{}
+	opts.SetName("TTL")
 	opts.SetExpireAfterSeconds(s.ExpDur)
 
 	model := mongo.IndexModel{
@@ -62,6 +65,79 @@ func (s *MongoClient) SetTTL() (interface{}, error) {
 	}
 
 	return col.Indexes().CreateOne(ctx, model)
+}
+
+// IndexKey holds a key of index
+type IndexKey struct {
+	Key  string
+	Desc bool
+}
+
+// Index reprsents a mongodb index
+type Index struct {
+	Keys   []IndexKey
+	Name   string
+	Unique bool
+	Sparse bool
+}
+
+func (i *Index) model() mongo.IndexModel {
+	keys := bson.D{}
+	for _, k := range i.Keys {
+		d := 1
+		if k.Desc {
+			d = -1
+		}
+		keys = append(keys, bson.E{k.Key, d})
+	}
+
+	opts := &options.IndexOptions{}
+	if i.Name != "" {
+		opts.SetName(i.Name)
+	}
+	opts.SetSparse(i.Sparse)
+	opts.SetUnique(i.Unique)
+
+	m := mongo.IndexModel{
+		Keys:    keys,
+		Options: opts,
+	}
+
+	return m
+}
+
+func (s *MongoClient) EnsureIndices(indices []Index) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	col, err := s.getCollection()
+	if err != nil {
+		return err
+	}
+
+	models := []mongo.IndexModel{}
+	for _, ind := range indices {
+		models = append(models, ind.model())
+	}
+
+	if _, err := col.Indexes().CreateMany(ctx, models); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *MongoClient) DropIndices() error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	col, err := s.getCollection()
+	if err != nil {
+		return err
+	}
+
+	_, err = col.Indexes().DropAll(ctx)
+	return err
 }
 
 func (s *MongoClient) Close() error {

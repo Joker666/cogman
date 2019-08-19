@@ -36,8 +36,16 @@ type Server struct {
 }
 
 func NewServer(cfg config.Server) (*Server, error) {
-	if cfg.ConnectionTimeout < 0 {
+	if cfg.ConnectionTimeout < 0 || cfg.Mongo.TTL < 0 || cfg.Redis.TTL < 0 {
 		return nil, ErrInvalidConfig
+	}
+
+	if cfg.Mongo.TTL == 0 {
+		cfg.Mongo.TTL = time.Hour * 24 * 30 // 1  month
+	}
+
+	if cfg.Redis.TTL == 0 {
+		cfg.Redis.TTL = time.Hour * 24 * 7 // 1 week
 	}
 
 	srvr := &Server{
@@ -222,6 +230,9 @@ func (s *Server) bootstrap() error {
 	}
 
 	s.taskRepo = repo.NewTaskRepo(rcon, mcl)
+	if err := s.taskRepo.EnsureIndices(); err != nil {
+		return err
+	}
 
 	ctx := context.Background()
 	cancel := context.CancelFunc(func() {})

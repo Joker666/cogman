@@ -80,6 +80,31 @@ func formTask(t *bsonTask) *util.Task {
 	}
 }
 
+func (s *TaskRepository) Indices() []infra.Index {
+	return []infra.Index{
+		{
+			Name:   "task_id_type",
+			Keys:   []infra.IndexKey{{"task_id", false}},
+			Unique: true,
+			Sparse: false,
+		},
+		{
+			Name:   "task_list_type",
+			Keys:   []infra.IndexKey{{"status", false}, {"created_at", true}},
+			Unique: false,
+			Sparse: false,
+		},
+	}
+}
+
+func (s *TaskRepository) EnsureIndices() error {
+	return s.MongoConn.EnsureIndices(s.Indices())
+}
+
+func (s *TaskRepository) DropIndices() error {
+	return s.MongoConn.DropIndices()
+}
+
 func (s *TaskRepository) CreateTask(task *util.Task) error {
 	if task.Status != util.StatusRetry {
 		task.Status = util.StatusInitiated
