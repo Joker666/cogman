@@ -10,9 +10,7 @@ Congman provide individual api and config method to make it easier to use. Just 
 
 #### Config:
 
-Cogman provide most simplest approach to setup config file. It only ask for `amqp` & `redis` connection address.
-
-Here `mongo` is optional. But for re-enqueuing task, It's required. Other field will be fill up by default value if they are empty.
+Cogman provide most simplest approach to setup config file. It only ask for `amqp` & `redis` connection address. Other field will be fill up by default value if they are empty.
 
 ```go
 cfg := &config.Config{
