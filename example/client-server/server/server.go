@@ -38,7 +38,7 @@ func main() {
 	// Task handler register
 	srvr.Register(exampletasks.TaskAddition, exampletasks.NewSumTask())
 	srvr.Register(exampletasks.TaskSubtraction, exampletasks.NewSubTask())
-	srvr.Register(exampletasks.TaskMultiplication, exampletasks.NewSubTask())
+	srvr.Register(exampletasks.TaskMultiplication, exampletasks.NewMulTask())
 
 	log.Print("[x] press ctrl + c to terminate the program")
 	close := make(chan struct{})

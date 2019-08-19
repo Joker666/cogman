@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"log"
 	"time"
 
@@ -57,6 +59,28 @@ func main() {
 		log.Fatal(err)
 	}
 	if err := cogman.SendTask(*task, nil); err != nil {
+		log.Fatal(err)
+	}
+
+	time.Sleep(time.Second * 3)
+	log.Print("========================================>")
+
+	task, err = exampletasks.GetSubtractionTask(324, 35, util.TaskPriorityHigh, 1)
+	if err != nil {
+		log.Fatal(err)
+	}
+	handlerFunc := util.HandlerFunc(func(ctx context.Context, payload []byte) error {
+		var body exampletasks.TaskBody
+		if err := json.Unmarshal(payload, &body); err != nil {
+			log.Print("Sub task process error", err)
+			return err
+		}
+		log.Printf("Task process by handlerfunc")
+		log.Printf("num1: %d num2: %d sub: %d", body.Num1, body.Num2, body.Num1-body.Num2)
+		return nil
+	})
+
+	if err := cogman.SendTask(*task, handlerFunc); err != nil {
 		log.Fatal(err)
 	}
 

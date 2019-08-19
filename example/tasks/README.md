@@ -18,14 +18,39 @@ type Task struct {
 
 ---
 
-### Handler
+#### Handler Struct
 
-A stuct need to implement this interface:
+A struct need to implement this interface:
 ```go
 type Handler interface {
 	Do(ctx context.Context, payload []byte) error
 }
 ```
+
+##### example
+```go
+type SumTask struct {
+	Name string 
+}
+
+func (t SumTask) Do(ctx context.Context, payload []byte) error {
+	var body TaskBody
+	if err := json.Unmarshal(payload, &body); err != nil {
+		log.Print("Sum task process error", err)
+		return err
+	}
+
+	log.Printf("num1: %d num2: %d sum: %d", body.Num1, body.Num2, body.Num1+body.Num2)
+	return nil
+}
+
+handler := exampletasks.NewSumTask()
+if err := cogman.SendTask(*task, handler); err != nil {
+	log.Fatal(err)
+}
+```
+
+#### HandlerFunc 
 
 A function type `HandlerFunc` also can pass as handler. 
 
@@ -36,3 +61,21 @@ func (h HandlerFunc) Do(ctx context.Context, payload []byte) error {
 	return h(ctx, payload)
 }
 ``` 
+
+##### example
+```go
+handlerFunc := util.HandlerFunc(func(ctx context.Context, payload []byte) error {
+	var body exampletasks.TaskBody
+	if err := json.Unmarshal(payload, &body); err != nil {
+		log.Print("Sub task process error", err)
+		return err
+	}
+	log.Printf("Task process by handlerfunc")
+	log.Printf("num1: %d num2: %d sub: %d", body.Num1, body.Num2, body.Num1-body.Num2)
+	return nil
+})
+
+if err := cogman.SendTask(*task, handlerFunc); err != nil {
+	log.Fatal(err)
+}
+```
