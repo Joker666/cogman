@@ -17,17 +17,22 @@ type Task struct {
 ```
 
 ---
+### Handler Interface
 
-#### Handler Struct
-
-A struct need to implement this interface:
 ```go
 type Handler interface {
 	Do(ctx context.Context, payload []byte) error
 }
 ```
 
+
+
+#### Handler Struct
+
+A struct need to implement handler interface:
+
 ##### example
+
 ```go
 type SumTask struct {
 	Name string 
@@ -65,12 +70,14 @@ func (h HandlerFunc) Do(ctx context.Context, payload []byte) error {
 ##### example
 ```go
 handlerFunc := util.HandlerFunc(func(ctx context.Context, payload []byte) error {
+	log.Printf("Task process by handlerfunc")
+
 	var body exampletasks.TaskBody
 	if err := json.Unmarshal(payload, &body); err != nil {
 		log.Print("Sub task process error", err)
 		return err
 	}
-	log.Printf("Task process by handlerfunc")
+
 	log.Printf("num1: %d num2: %d sub: %d", body.Num1, body.Num2, body.Num1-body.Num2)
 	return nil
 })
