@@ -37,6 +37,7 @@ func (s *TaskRepository) CloseClients() {
 type bsonTask struct {
 	ID             primitive.ObjectID `bson:"_id"`
 	TaskID         string             `bson:"task_id"`
+	PrimaryKey     string             `bson:"primary_key"`
 	Name           string             `bson:"name"`
 	OriginalTaskID string             `bson:"original_task_id"`
 	Payload        []byte             `bson:"payload"`
@@ -52,6 +53,7 @@ type bsonTask struct {
 func prepareBsonTask(t *util.Task) *bsonTask {
 	return &bsonTask{
 		TaskID:         t.TaskID,
+		PrimaryKey:     t.PrimaryKey,
 		Name:           t.Name,
 		Payload:        t.Payload,
 		Priority:       string(t.Priority),
@@ -69,6 +71,7 @@ func formTask(t *bsonTask) *util.Task {
 	return &util.Task{
 		TaskID:         t.TaskID,
 		Name:           t.Name,
+		PrimaryKey:     t.PrimaryKey,
 		Payload:        t.Payload,
 		Priority:       util.TaskPriority(t.Priority),
 		OriginalTaskID: t.OriginalTaskID,

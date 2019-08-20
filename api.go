@@ -112,8 +112,6 @@ func setConfig(cfg *config.Config) (*config.Server, *config.Client, error) {
 	srvrCfg.Mongo = config.Mongo{cfg.MongoURI, cfg.MongoTTL}
 	clntCfg.Mongo = config.Mongo{cfg.MongoURI, cfg.MongoTTL}
 
-	clntCfg.ReEnqueue = cfg.ReEnqueue
-
 	return srvrCfg, clntCfg, nil
 }
 
