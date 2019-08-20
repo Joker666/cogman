@@ -51,3 +51,14 @@ func (p Status) CheckStatusOrder(st Status) bool {
 
 	return val[p] > val[st]
 }
+
+type TaskDateRangeCount struct {
+	ID              time.Time
+	Total           int
+	CountRetry      int
+	CountInitiated  int
+	CountQueued     int
+	CountInProgress int
+	CountSuccess    int
+	CountFailed     int
+}

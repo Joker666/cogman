@@ -411,3 +411,141 @@ func (s *TaskRepository) List(v map[string]interface{}, startTime, endTime *time
 
 	return task, nil
 }
+
+type bsonTaskDateRangeCount struct {
+	ID              time.Time `bson:"_id"`
+	Total           int       `bson:"total"`
+	CountRetry      int       `bson:"retry"`
+	CountInitiated  int       `bson:"initiated"`
+	CountQueued     int       `bson:"queued"`
+	CountInProgress int       `bson:"in_progress"`
+	CountSuccess    int       `bson:"success"`
+	CountFailed     int       `bson:"failed"`
+}
+
+func formTaskDateRangeCount(t *bsonTaskDateRangeCount) *util.TaskDateRangeCount {
+	return &util.TaskDateRangeCount{
+		ID:              t.ID,
+		Total:           t.Total,
+		CountRetry:      t.CountRetry,
+		CountInitiated:  t.CountInitiated,
+		CountQueued:     t.CountQueued,
+		CountInProgress: t.CountInProgress,
+		CountFailed:     t.CountFailed,
+		CountSuccess:    t.CountSuccess,
+	}
+}
+
+func (s *TaskRepository) ListCountDateRangeInterval(startTime, endTime time.Time, interval int) ([]util.TaskDateRangeCount, error) {
+	bndr := MgoTimeRangeBucketBoundaries(startTime, endTime, interval)
+	q := []bson.M{
+		bson.M{
+			"$match": bson.M{
+				"created_at": bson.M{
+					"$gte": startTime,
+					"$lte": endTime,
+				},
+			},
+		},
+		bson.M{
+			"$bucket": bson.M{
+				"groupBy":    "$created_at",
+				"boundaries": bndr,
+				"default":    "Other",
+				"output": bson.M{
+					"total": bson.M{
+						"$sum": 1,
+					},
+					"retry": bson.M{
+						"$sum": bson.M{
+							"$cond": bson.M{
+								"if": bson.M{
+									"$eq": []interface{}{"$status", "retry"},
+								}, "then": 1, "else": 0,
+							},
+						},
+					},
+					"initiated": bson.M{
+						"$sum": bson.M{
+							"$cond": bson.M{
+								"if": bson.M{
+									"$eq": []interface{}{"$status", "initiated"},
+								}, "then": 1, "else": 0,
+							},
+						},
+					},
+					"queued": bson.M{
+						"$sum": bson.M{
+							"$cond": bson.M{
+								"if": bson.M{
+									"$eq": []interface{}{"$status", "queued"},
+								}, "then": 1, "else": 0,
+							},
+						},
+					},
+					"in_progress": bson.M{
+						"$sum": bson.M{
+							"$cond": bson.M{
+								"if": bson.M{
+									"$eq": []interface{}{"$status", "in_progress"},
+								}, "then": 1, "else": 0,
+							},
+						},
+					},
+					"failed": bson.M{
+						"$sum": bson.M{
+							"$cond": bson.M{
+								"if": bson.M{
+									"$eq": []interface{}{"$status", "failed"},
+								}, "then": 1, "else": 0,
+							},
+						},
+					},
+					"success": bson.M{
+						"$sum": bson.M{
+							"$cond": bson.M{
+								"if": bson.M{
+									"$eq": []interface{}{"$status", "success"},
+								}, "then": 1, "else": 0,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	cursor, err := s.MongoConn.Aggregate(q)
+	if err != nil {
+		return nil, err
+	}
+
+	task := []util.TaskDateRangeCount{}
+
+	for cursor.Next(context.Background()) {
+		bTask := &bsonTaskDateRangeCount{}
+		if err := cursor.Decode(bTask); err != nil {
+			return nil, err
+		}
+
+		task = append(task, *formTaskDateRangeCount(bTask))
+	}
+
+	return task, nil
+}
+
+func MgoTimeRangeBucketBoundaries(startDate, endDate time.Time, interval int) []time.Time {
+	bndr := []time.Time{}
+	bndr = append(bndr, startDate)
+	intlDt := startDate
+	enDt := endDate
+	for {
+		intlDt = intlDt.Add(time.Minute * time.Duration(interval))
+		if intlDt.After(endDate) || intlDt.Equal(endDate) {
+			break
+		}
+		bndr = append(bndr, intlDt)
+	}
+
+	return append(bndr, enDt.AddDate(0, 0, 1))
+}

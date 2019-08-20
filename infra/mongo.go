@@ -170,3 +170,23 @@ func (s *MongoClient) List(q interface{}, skip, limit int) (*mongo.Cursor, error
 
 	return cursor, nil
 }
+
+func (s *MongoClient) Aggregate(q interface{}) (*mongo.Cursor, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	col, err := s.getCollection()
+	if err != nil {
+		return nil, err
+	}
+
+	cursor, err := col.Aggregate(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	if cursor.Err() != nil {
+		return nil, cursor.Err()
+	}
+
+	return cursor, nil
+}
