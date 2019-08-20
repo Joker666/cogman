@@ -78,6 +78,7 @@ func formTask(t *bsonTask) *util.Task {
 		Retry:          t.Retry,
 		Status:         util.Status(t.Status),
 		FailError:      t.FailError,
+		Duration:       t.Duration,
 		CreatedAt:      t.CreatedAt,
 		UpdatedAt:      t.UpdatedAt,
 	}
@@ -86,14 +87,27 @@ func formTask(t *bsonTask) *util.Task {
 func (s *TaskRepository) Indices() []infra.Index {
 	return []infra.Index{
 		{
-			Name:   "task_id_type",
-			Keys:   []infra.IndexKey{{"task_id", false}},
+			Name: "task_id_type",
+			Keys: []infra.IndexKey{
+				{"task_id", false},
+			},
 			Unique: true,
 			Sparse: false,
 		},
 		{
-			Name:   "task_list_type",
-			Keys:   []infra.IndexKey{{"status", false}, {"created_at", true}},
+			Name: "primary_key_type",
+			Keys: []infra.IndexKey{
+				{"primary_key", false},
+			},
+			Unique: true,
+			Sparse: false,
+		},
+		{
+			Name: "task_list_type",
+			Keys: []infra.IndexKey{
+				{"status", false},
+				{"created_at", true},
+			},
 			Unique: false,
 			Sparse: false,
 		},
