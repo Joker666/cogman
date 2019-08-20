@@ -376,3 +376,38 @@ func (s *TaskRepository) ListByStatusBefore(status util.Status, t time.Time, ski
 
 	return task, nil
 }
+
+func (s *TaskRepository) List(v map[string]interface{}, startTime, endTime *time.Time, skip, limit int) ([]*util.Task, error) {
+	if s.MongoConn == nil {
+		return nil, ErrMongoNoConnection
+	}
+
+	q := bson.M{}
+	for key, val := range v {
+		q[key] = val
+	}
+
+	if !(startTime == nil || endTime == nil) {
+		q["created_at"] = bson.M{
+			"$gte": startTime,
+			"$lte": endTime,
+		}
+	}
+
+	task := []*util.Task{}
+	cursor, err := s.MongoConn.List(q, skip, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	for cursor.Next(context.Background()) {
+		bTask := &bsonTask{}
+		if err := cursor.Decode(bTask); err != nil {
+			return nil, err
+		}
+
+		task = append(task, formTask(bTask))
+	}
+
+	return task, nil
+}

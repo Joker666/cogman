@@ -10,6 +10,7 @@ import (
 	"github.com/Tapfury/cogman/config"
 	"github.com/Tapfury/cogman/infra"
 	"github.com/Tapfury/cogman/repo"
+	"github.com/Tapfury/cogman/rest"
 	"github.com/Tapfury/cogman/util"
 
 	"github.com/streadway/amqp"
@@ -146,6 +147,9 @@ func (s *Server) Start() error {
 	}
 
 	ctx, stop := context.WithCancel(context.Background())
+
+	go rest.StartRestServer(ctx, "", s.taskRepo, s.lgr)
+	s.lgr.Info("rest server started", util.Object{Key: "port", Val: "8081"})
 
 	go s.Consume(ctx, s.cfg.AMQP.Prefetch)
 
