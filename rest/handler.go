@@ -105,26 +105,14 @@ func parseValues(r *http.Request) (map[string]interface{}, error) {
 	q := r.URL.Query()
 	v := make(map[string]interface{})
 
-	if val := q.Get("name"); val != "" {
-		v["name"] = val
-	}
 	if val := q.Get("task_id"); val != "" {
 		v["task_id"] = val
-	}
-	if val := q.Get("priority"); val != "" {
-		v["priority"] = val
-	}
-	if val := q.Get("original_task_id"); val != "" {
-		v["original_task_id"] = val
 	}
 	if val := q.Get("status"); val != "" {
 		v["status"] = val
 	}
-	if val := q.Get("retry"); val != "" {
-		v["retry"], _ = strconv.Atoi(val)
-	}
-	if val := q.Get("fail_error"); val != "" {
-		v["fail_error"] = val
+	if val := q.Get("primary_key"); val != "" {
+		v["primary_key"] = val
 	}
 
 	return v, nil

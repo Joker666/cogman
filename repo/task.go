@@ -111,6 +111,17 @@ func (s *TaskRepository) Indices() []infra.Index {
 			Unique: false,
 			Sparse: false,
 		},
+		{
+			Name: "task_filter_type",
+			Keys: []infra.IndexKey{
+				{"task_id", false},
+				{"primary_key", false},
+				{"status", false},
+				{"created_at", true},
+			},
+			Unique: false,
+			Sparse: false,
+		},
 	}
 }
 
