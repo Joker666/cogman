@@ -37,6 +37,7 @@ func (s *TaskRepository) CloseClients() {
 type bsonTask struct {
 	ID             primitive.ObjectID `bson:"_id"`
 	TaskID         string             `bson:"task_id"`
+	PrimaryKey     string             `bson:"primary_key"`
 	Name           string             `bson:"name"`
 	OriginalTaskID string             `bson:"original_task_id"`
 	Payload        []byte             `bson:"payload"`
@@ -52,6 +53,7 @@ type bsonTask struct {
 func prepareBsonTask(t *util.Task) *bsonTask {
 	return &bsonTask{
 		TaskID:         t.TaskID,
+		PrimaryKey:     t.PrimaryKey,
 		Name:           t.Name,
 		Payload:        t.Payload,
 		Priority:       string(t.Priority),
@@ -69,15 +71,55 @@ func formTask(t *bsonTask) *util.Task {
 	return &util.Task{
 		TaskID:         t.TaskID,
 		Name:           t.Name,
+		PrimaryKey:     t.PrimaryKey,
 		Payload:        t.Payload,
 		Priority:       util.TaskPriority(t.Priority),
 		OriginalTaskID: t.OriginalTaskID,
 		Retry:          t.Retry,
 		Status:         util.Status(t.Status),
 		FailError:      t.FailError,
+		Duration:       t.Duration,
 		CreatedAt:      t.CreatedAt,
 		UpdatedAt:      t.UpdatedAt,
 	}
+}
+
+func (s *TaskRepository) Indices() []infra.Index {
+	return []infra.Index{
+		{
+			Name: "task_id_type",
+			Keys: []infra.IndexKey{
+				{"task_id", false},
+			},
+			Unique: true,
+			Sparse: false,
+		},
+		{
+			Name: "primary_key_type",
+			Keys: []infra.IndexKey{
+				{"primary_key", false},
+			},
+			Unique: true,
+			Sparse: false,
+		},
+		{
+			Name: "task_list_type",
+			Keys: []infra.IndexKey{
+				{"status", false},
+				{"created_at", true},
+			},
+			Unique: false,
+			Sparse: false,
+		},
+	}
+}
+
+func (s *TaskRepository) EnsureIndices() error {
+	return s.MongoConn.EnsureIndices(s.Indices())
+}
+
+func (s *TaskRepository) DropIndices() error {
+	return s.MongoConn.DropIndices()
 }
 
 func (s *TaskRepository) CreateTask(task *util.Task) error {

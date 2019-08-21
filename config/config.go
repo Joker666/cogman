@@ -15,8 +15,6 @@ type Config struct {
 
 	HighPriorityQueueCount int
 	LowPriorityQueueCount  int
-
-	ReEnqueue bool
 }
 
 type Server struct {

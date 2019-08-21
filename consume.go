@@ -75,7 +75,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			s.lgr.Debug("task processing stopped")
 			done = true
 		case msg = <-taskPool:
-			s.lgr.Debug("received a task to process", util.Object{Key: "msgID", Val: msg.MessageId})
+			s.lgr.Debug("received a task to process", util.Object{Key: "TaskID", Val: msg.MessageId})
 		case errTask := <-errCh:
 			s.lgr.Error("got error in task", errTask.err, util.Object{Key: "ID", Val: errTask.taskID})
 			func() {

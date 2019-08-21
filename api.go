@@ -47,12 +47,20 @@ func StartBackground(cfg *config.Config) error {
 
 func SendTask(task util.Task, hdlr util.Handler) error {
 	if hdlr != nil {
-		if err := srvr.Register(task.Name, hdlr); err != nil {
+		if err := Register(task.Name, hdlr); err != nil {
 			return err
 		}
 	}
 
 	return clnt.SendTask(task)
+}
+
+func Register(taskName string, hdlr util.Handler) error {
+	if hdlr == nil || taskName == "" {
+		return ErrInvalidData
+	}
+
+	return srvr.Register(taskName, hdlr)
 }
 
 func setConfig(cfg *config.Config) (*config.Server, *config.Client, error) {
@@ -101,18 +109,12 @@ func setConfig(cfg *config.Config) (*config.Server, *config.Client, error) {
 	srvrCfg.Redis = config.Redis{cfg.RedisURI, cfg.RedisTTL}
 	clntCfg.Redis = config.Redis{cfg.RedisURI, cfg.RedisTTL}
 
-	if cfg.MongoURI == "" {
-		cfg.MongoURI = "mongodb://root:secret@localhost:27017"
-	}
-
 	if cfg.MongoTTL == 0 {
 		cfg.MongoTTL = time.Hour * 24 * 30 // 1  month
 	}
 
 	srvrCfg.Mongo = config.Mongo{cfg.MongoURI, cfg.MongoTTL}
 	clntCfg.Mongo = config.Mongo{cfg.MongoURI, cfg.MongoTTL}
-
-	clntCfg.ReEnqueue = cfg.ReEnqueue
 
 	return srvrCfg, clntCfg, nil
 }

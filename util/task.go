@@ -26,6 +26,7 @@ func (p TaskPriority) Valid() bool {
 
 type Task struct {
 	TaskID         string
+	PrimaryKey     string
 	Name           string
 	OriginalTaskID string
 	Retry          int
