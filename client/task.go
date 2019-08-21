@@ -141,7 +141,7 @@ func (s *Session) SendTask(t util.Task) error {
 	return errs
 }
 
-func (s *Session) RetryTask(t util.Task) {
+func (s *Session) RetryTask(t util.Task) error {
 	task := util.Task{
 		Name:           t.Name,
 		OriginalTaskID: t.OriginalTaskID,
@@ -153,5 +153,8 @@ func (s *Session) RetryTask(t util.Task) {
 	s.taskRepo.UpdateRetryCount(t.OriginalTaskID, -1)
 	if err := s.SendTask(task); err != nil {
 		s.lgr.Error("failed to retry", err, util.Object{Key: "TaskID", Val: task.TaskID}, util.Object{"OriginalTaskID", task.OriginalTaskID})
+		return err
 	}
+
+	return nil
 }

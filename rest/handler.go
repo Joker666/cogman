@@ -1,6 +1,8 @@
 package rest
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -158,6 +160,50 @@ func (s *cogmanHandler) info(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp.ServeData(w, r, http.StatusOK, amqpInfo{len(data), totalTask, data}, nil)
+}
+
+type TaskRetry struct {
+	TaskID string `json:"task_id"`
+	Retry  int    `json: "retry"`
+}
+
+func (s *cogmanHandler) retry(w http.ResponseWriter, r *http.Request) {
+	rTask := TaskRetry{}
+	err := parseJSON(r.Body, &rTask)
+	if err != nil {
+		resp.ServeBadRequest(w, r, err)
+		return
+	}
+	if rTask.TaskID == "" {
+		resp.ServeBadRequest(w, r, ErrTaskIDRequired)
+		return
+	}
+
+	task, err := s.taskRepo.GetTask(rTask.TaskID)
+	if err != nil {
+		if err == cogman.ErrTaskNotFound {
+			resp.ServeNotFound(w, r, ErrTaskNotFound)
+			return
+		}
+		resp.ServeError(w, r, err)
+		return
+	}
+
+	if rTask.Retry == 0 {
+		rTask.Retry = 1
+	}
+
+	s.taskRepo.UpdateRetryCount(task.OriginalTaskID, rTask.Retry)
+	if err := s.clnt.RetryTask(*task); err != nil {
+		resp.ServeError(w, r, err)
+		return
+	}
+
+	resp.ServeData(w, r, http.StatusOK, "OK", nil)
+}
+
+func parseJSON(r io.Reader, v interface{}) error {
+	return json.NewDecoder(r).Decode(v)
 }
 
 func parseValues(r *http.Request) (map[string]interface{}, error) {
