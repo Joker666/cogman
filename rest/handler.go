@@ -5,31 +5,53 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Tapfury/cogman/client"
+	"github.com/Tapfury/cogman/repo"
 	cogman "github.com/Tapfury/cogman/repo"
 	"github.com/Tapfury/cogman/rest/resp"
 	"github.com/Tapfury/cogman/util"
+	"github.com/streadway/amqp"
 )
 
+type RestConfig struct {
+	Port string
+
+	AmqpCon *amqp.Connection
+	Clnt    *client.Session
+
+	TaskRep   *repo.TaskRepository
+	QueueName []string
+
+	Lgr util.Logger
+}
+
 type cogmanHandler struct {
-	mux      *http.ServeMux
-	taskRepo *cogman.TaskRepository
-	log      util.Logger
+	mux *http.ServeMux
+
+	amqp      *amqp.Connection
+	clnt      *client.Session
+	taskRepo  *cogman.TaskRepository
+	queueName []string
+
+	log util.Logger
 }
 
 func (s *cogmanHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
+	// TODO: auth middleware
 
 	s.mux.ServeHTTP(w, r)
 }
 
-func NewCogmanHandler(taskRep *cogman.TaskRepository, lgr util.Logger) *cogmanHandler {
+func NewCogmanHandler(cfg *RestConfig) *cogmanHandler {
 	return &cogmanHandler{
-		mux:      http.NewServeMux(),
-		taskRepo: taskRep,
-		log:      lgr,
+		mux: http.NewServeMux(),
+
+		amqp:      cfg.AmqpCon,
+		clnt:      cfg.Clnt,
+		taskRepo:  cfg.TaskRep,
+		queueName: cfg.QueueName,
+
+		log: cfg.Lgr,
 	}
 }
 
@@ -99,6 +121,43 @@ func (s *cogmanHandler) GetDaterangecount(w http.ResponseWriter, r *http.Request
 	}
 
 	resp.ServeData(w, r, http.StatusOK, tasks, nil)
+}
+
+type queueInfo struct {
+	Name   string
+	Task   int
+	Status string
+}
+
+type amqpInfo struct {
+	TotalQueue int `json: "total_queue"`
+	TotalTask  int `json: "total_task"`
+	Queue      []queueInfo
+}
+
+func (s *cogmanHandler) info(w http.ResponseWriter, r *http.Request) {
+	chnl, err := s.amqp.Channel()
+	if err != nil {
+		resp.ServeError(w, r, err)
+		return
+	}
+	defer chnl.Close()
+
+	data := []queueInfo{}
+	totalTask := 0
+
+	for _, q := range s.queueName {
+		queue, err := chnl.QueueInspect(q)
+		if err != nil {
+			data = append(data, queueInfo{q, 0, err.Error()})
+			continue
+		}
+
+		data = append(data, queueInfo{q, queue.Messages, "OK"})
+		totalTask += queue.Messages
+	}
+
+	resp.ServeData(w, r, http.StatusOK, amqpInfo{len(data), totalTask, data}, nil)
 }
 
 func parseValues(r *http.Request) (map[string]interface{}, error) {

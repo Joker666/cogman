@@ -5,19 +5,16 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-
-	cogman "github.com/Tapfury/cogman/repo"
-	"github.com/Tapfury/cogman/util"
 )
 
-func StartRestServer(ctx context.Context, port string, taskRep *cogman.TaskRepository, lgr util.Logger) {
-	if port == "" {
-		port = ":8081"
+func StartRestServer(ctx context.Context, cfg *RestConfig) {
+	if cfg.Port == "" {
+		cfg.Port = ":8081"
 	}
 
 	server := &http.Server{
-		Addr:         port,
-		Handler:      getHandler(taskRep, lgr),
+		Addr:         cfg.Port,
+		Handler:      getHandler(cfg),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
@@ -32,16 +29,16 @@ func StartRestServer(ctx context.Context, port string, taskRep *cogman.TaskRepos
 
 	select {
 	case <-ctx.Done():
-		lgr.Info("rest server: server closing")
+		cfg.Lgr.Info("rest server: server closing")
 	case err := <-errorChan:
-		lgr.Error("rest server: error found", err)
+		cfg.Lgr.Error("rest server: error found", err)
 	}
 
 	_ = server.Shutdown(ctx)
 }
 
-func getHandler(taskRep *cogman.TaskRepository, lgr util.Logger) http.Handler {
-	hdlr := NewCogmanHandler(taskRep, lgr)
+func getHandler(cfg *RestConfig) http.Handler {
+	hdlr := NewCogmanHandler(cfg)
 
 	hdlr.mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Hello, Cogman alive!!!")
@@ -50,6 +47,7 @@ func getHandler(taskRep *cogman.TaskRepository, lgr util.Logger) http.Handler {
 	hdlr.mux.HandleFunc("/get", hdlr.get)
 	hdlr.mux.HandleFunc("/list", hdlr.listTask)
 	hdlr.mux.HandleFunc("/daterangecount", hdlr.GetDaterangecount)
+	hdlr.mux.HandleFunc("/info", hdlr.info)
 
 	return hdlr
 }

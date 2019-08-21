@@ -97,6 +97,7 @@ func (s *TaskRepository) Indices() []infra.Index {
 		{
 			Name: "primary_key_type",
 			Keys: []infra.IndexKey{
+				{"task_id", false},
 				{"primary_key", false},
 			},
 			Unique: true,
