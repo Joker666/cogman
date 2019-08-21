@@ -2,7 +2,6 @@ package resp
 
 import (
 	"encoding/json"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"net/http"
@@ -59,27 +58,6 @@ func (r *JSONResponse) Header() http.Header {
 
 func (r *JSONResponse) Body() []byte {
 	body, err := json.Marshal(r)
-	if err != nil {
-		panic(err)
-	}
-	return body
-}
-
-type XMLResponse struct {
-	response
-	body interface{}
-}
-
-func (r *XMLResponse) Header() http.Header {
-	if r.header == nil {
-		r.header = http.Header{}
-	}
-	r.header.Set("Content-Type", "application/xml")
-	return r.header
-}
-
-func (r *XMLResponse) Body() []byte {
-	body, err := xml.Marshal(r.body)
 	if err != nil {
 		panic(err)
 	}

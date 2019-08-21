@@ -437,6 +437,18 @@ func formTaskDateRangeCount(t *bsonTaskDateRangeCount) *util.TaskDateRangeCount 
 }
 
 func (s *TaskRepository) ListCountDateRangeInterval(startTime, endTime time.Time, interval int) ([]util.TaskDateRangeCount, error) {
+	bsonCond := func(status string) bson.M {
+		return bson.M{
+			"$sum": bson.M{
+				"$cond": bson.M{
+					"if": bson.M{
+						"$eq": []interface{}{"$status", status},
+					}, "then": 1, "else": 0,
+				},
+			},
+		}
+	}
+
 	bndr := MgoTimeRangeBucketBoundaries(startTime, endTime, interval)
 	q := []bson.M{
 		bson.M{
@@ -456,60 +468,12 @@ func (s *TaskRepository) ListCountDateRangeInterval(startTime, endTime time.Time
 					"total": bson.M{
 						"$sum": 1,
 					},
-					"retry": bson.M{
-						"$sum": bson.M{
-							"$cond": bson.M{
-								"if": bson.M{
-									"$eq": []interface{}{"$status", "retry"},
-								}, "then": 1, "else": 0,
-							},
-						},
-					},
-					"initiated": bson.M{
-						"$sum": bson.M{
-							"$cond": bson.M{
-								"if": bson.M{
-									"$eq": []interface{}{"$status", "initiated"},
-								}, "then": 1, "else": 0,
-							},
-						},
-					},
-					"queued": bson.M{
-						"$sum": bson.M{
-							"$cond": bson.M{
-								"if": bson.M{
-									"$eq": []interface{}{"$status", "queued"},
-								}, "then": 1, "else": 0,
-							},
-						},
-					},
-					"in_progress": bson.M{
-						"$sum": bson.M{
-							"$cond": bson.M{
-								"if": bson.M{
-									"$eq": []interface{}{"$status", "in_progress"},
-								}, "then": 1, "else": 0,
-							},
-						},
-					},
-					"failed": bson.M{
-						"$sum": bson.M{
-							"$cond": bson.M{
-								"if": bson.M{
-									"$eq": []interface{}{"$status", "failed"},
-								}, "then": 1, "else": 0,
-							},
-						},
-					},
-					"success": bson.M{
-						"$sum": bson.M{
-							"$cond": bson.M{
-								"if": bson.M{
-									"$eq": []interface{}{"$status", "success"},
-								}, "then": 1, "else": 0,
-							},
-						},
-					},
+					"retry":       bsonCond("retry"),
+					"initiated":   bsonCond("initiated"),
+					"queued":      bsonCond("queued"),
+					"in_progress": bsonCond("in_progress"),
+					"failed":      bsonCond("failed"),
+					"success":     bsonCond("success"),
 				},
 			},
 		},

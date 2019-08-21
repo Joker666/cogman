@@ -43,8 +43,8 @@ func StartRestServer(ctx context.Context, port string, taskRep *cogman.TaskRepos
 func getHandler(taskRep *cogman.TaskRepository, lgr util.Logger) http.Handler {
 	hdlr := NewCogmanHandler(taskRep, lgr)
 
-	hdlr.mux.HandleFunc("/ping!!!", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "Hello, Cogman alive")
+	hdlr.mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "Hello, Cogman alive!!!")
 	})
 
 	hdlr.mux.HandleFunc("/list", hdlr.listTask)
