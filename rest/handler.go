@@ -33,23 +33,44 @@ func NewCogmanHandler(taskRep *cogman.TaskRepository, lgr util.Logger) *cogmanHa
 	}
 }
 
+func (s *cogmanHandler) get(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	taskID := q.Get("task_id")
+	if taskID == "" {
+		resp.ServeError(w, r, ErrTaskIDRequired)
+		return
+	}
+
+	task, err := s.taskRepo.GetTask(taskID)
+	if err != nil {
+		if err == cogman.ErrTaskNotFound {
+			resp.ServeNotFound(w, r, ErrTaskNotFound)
+			return
+		}
+		resp.ServeError(w, r, err)
+		return
+	}
+
+	resp.ServeData(w, r, http.StatusOK, task, nil)
+}
+
 func (s *cogmanHandler) listTask(w http.ResponseWriter, r *http.Request) {
 	skip, limit := parseSkipLimit(r, 10, 10)
 	v, err := parseValues(r)
 	if err != nil {
-		resp.ServeBadRequest(w, r, err)
+		resp.ServeError(w, r, err)
 		return
 	}
 
 	startTime, endTime, err := parseTimeRange(r)
 	if err != nil {
-		resp.ServeBadRequest(w, r, err)
+		resp.ServeError(w, r, err)
 		return
 	}
 
 	taskList, err := s.taskRepo.List(v, startTime, endTime, skip, limit)
 	if err != nil {
-		resp.ServeBadRequest(w, r, err)
+		resp.ServeError(w, r, err)
 		return
 	}
 
@@ -59,7 +80,7 @@ func (s *cogmanHandler) listTask(w http.ResponseWriter, r *http.Request) {
 func (s *cogmanHandler) GetDaterangecount(w http.ResponseWriter, r *http.Request) {
 	v, err := parseDateRangeFilterValues(r)
 	if err != nil {
-		resp.ServeBadRequest(w, r, err)
+		resp.ServeError(w, r, err)
 		return
 	}
 	std, _ := v["startDate"].(time.Time)
@@ -67,13 +88,13 @@ func (s *cogmanHandler) GetDaterangecount(w http.ResponseWriter, r *http.Request
 	itv, _ := v["interval"].(int)
 
 	if std.After(etd) {
-		resp.ServeBadRequest(w, r, ErrInvalidTimeRange)
+		resp.ServeError(w, r, ErrInvalidTimeRange)
 		return
 	}
 
 	tasks, err := s.taskRepo.ListCountDateRangeInterval(std, etd, itv)
 	if err != nil {
-		resp.ServeBadRequest(w, r, err)
+		resp.ServeError(w, r, err)
 		return
 	}
 

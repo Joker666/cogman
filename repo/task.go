@@ -138,6 +138,9 @@ func (s *TaskRepository) GetTask(id string) (*util.Task, error) {
 	if err != nil {
 		return nil, err
 	}
+	if byts == nil {
+		return nil, ErrTaskNotFound
+	}
 
 	task := &util.Task{}
 	if err := json.Unmarshal(byts, &task); err != nil {

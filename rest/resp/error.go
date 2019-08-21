@@ -6,6 +6,8 @@ import (
 	"github.com/Tapfury/phoneline-api/util"
 )
 
+type CogmanError error
+
 // Error represents a response object of api error
 type Error struct {
 	ID         string                 `json:"id,omitempty"`
@@ -42,6 +44,20 @@ func ServeUnauthorized(w http.ResponseWriter, r *http.Request, err error) {
 	Render(w, r, re)
 }
 
+// ServeNotFound serves http NotFound
+func ServeNotFound(w http.ResponseWriter, r *http.Request, err error) {
+	re := &JSONResponse{
+		response: response{code: http.StatusNotFound},
+		Errors: []Error{
+			{
+				ID:      util.GenerateRandStr(10),
+				Message: err.Error(),
+			},
+		},
+	}
+	Render(w, r, re)
+}
+
 // ServeForbidden serves http Forbidden
 func ServeForbidden(w http.ResponseWriter, r *http.Request, err error) {
 	re := &JSONResponse{
@@ -68,4 +84,14 @@ func ServeInternalServerError(w http.ResponseWriter, r *http.Request, err error)
 		},
 	}
 	Render(w, r, re)
+}
+
+// ServeError serves error with appropriate http status code determined from error type
+func ServeError(w http.ResponseWriter, r *http.Request, err error) {
+	switch err := err.(type) {
+	case CogmanError:
+		ServeBadRequest(w, r, err)
+	default:
+		ServeInternalServerError(w, r, err)
+	}
 }

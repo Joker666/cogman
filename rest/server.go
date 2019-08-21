@@ -47,6 +47,7 @@ func getHandler(taskRep *cogman.TaskRepository, lgr util.Logger) http.Handler {
 		fmt.Fprint(w, "Hello, Cogman alive!!!")
 	})
 
+	hdlr.mux.HandleFunc("/get", hdlr.get)
 	hdlr.mux.HandleFunc("/list", hdlr.listTask)
 	hdlr.mux.HandleFunc("/daterangecount", hdlr.GetDaterangecount)
 
