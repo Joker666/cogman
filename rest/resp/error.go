@@ -30,6 +30,19 @@ func ServeBadRequest(w http.ResponseWriter, r *http.Request, err error) {
 	Render(w, r, re)
 }
 
+func ServeInvalidMethod(w http.ResponseWriter, r *http.Request, err error) {
+	re := &JSONResponse{
+		response: response{code: http.StatusMethodNotAllowed},
+		Errors: []Error{
+			{
+				ID:      util.GenerateRandStr(10),
+				Message: err.Error(),
+			},
+		},
+	}
+	Render(w, r, re)
+}
+
 // ServeUnauthorized serves http Unauthorized
 func ServeUnauthorized(w http.ResponseWriter, r *http.Request, err error) {
 	re := &JSONResponse{

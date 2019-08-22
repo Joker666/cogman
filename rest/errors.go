@@ -8,6 +8,7 @@ import (
 
 var (
 	ErrInvalidData              resp.CogmanError = errors.New("cogman rest: Invalid data")
+	ErrInvalidMethod            resp.CogmanError = errors.New("cogman rest: Invalid method")
 	ErrTaskIDRequired           resp.CogmanError = errors.New("cogman rest: task_id required")
 	ErrTaskNotFound             resp.CogmanError = errors.New("cogman rest: task not found")
 	ErrBothStartEndTimeRequired resp.CogmanError = errors.New("cogman rest: both start & end time required")

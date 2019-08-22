@@ -58,6 +58,11 @@ func NewCogmanHandler(cfg *RestConfig) *cogmanHandler {
 }
 
 func (s *cogmanHandler) get(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
+		return
+	}
+
 	q := r.URL.Query()
 	taskID := q.Get("task_id")
 	if taskID == "" {
@@ -79,6 +84,11 @@ func (s *cogmanHandler) get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *cogmanHandler) listTask(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
+		return
+	}
+
 	skip, limit := parseSkipLimit(r, 10, 10)
 	v, err := parseValues(r)
 	if err != nil {
@@ -102,6 +112,11 @@ func (s *cogmanHandler) listTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *cogmanHandler) GetDaterangecount(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
+		return
+	}
+
 	v, err := parseDateRangeFilterValues(r)
 	if err != nil {
 		resp.ServeError(w, r, err)
@@ -138,6 +153,11 @@ type amqpInfo struct {
 }
 
 func (s *cogmanHandler) info(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
+		return
+	}
+
 	chnl, err := s.amqp.Channel()
 	if err != nil {
 		resp.ServeError(w, r, err)
@@ -168,6 +188,11 @@ type TaskRetry struct {
 }
 
 func (s *cogmanHandler) retry(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
+		return
+	}
+
 	rTask := TaskRetry{}
 	err := parseJSON(r.Body, &rTask)
 	if err != nil {
