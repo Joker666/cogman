@@ -111,7 +111,7 @@ func (s *cogmanHandler) listTask(w http.ResponseWriter, r *http.Request) {
 	resp.ServeData(w, r, http.StatusOK, taskList, nil)
 }
 
-func (s *cogmanHandler) GetDaterangecount(w http.ResponseWriter, r *http.Request) {
+func (s *cogmanHandler) getDaterangecount(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
 		return

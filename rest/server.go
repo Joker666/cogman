@@ -46,7 +46,7 @@ func getHandler(cfg *RestConfig) http.Handler {
 
 	hdlr.mux.HandleFunc("/get", hdlr.get)
 	hdlr.mux.HandleFunc("/list", hdlr.listTask)
-	hdlr.mux.HandleFunc("/daterangecount", hdlr.GetDaterangecount)
+	hdlr.mux.HandleFunc("/daterangecount", hdlr.getDaterangecount)
 	hdlr.mux.HandleFunc("/info", hdlr.info)
 	hdlr.mux.HandleFunc("/retry", hdlr.retry)
 
