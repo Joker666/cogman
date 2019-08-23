@@ -97,6 +97,7 @@ func (s *TaskRepository) Indices() []infra.Index {
 		{
 			Name: "primary_key_type",
 			Keys: []infra.IndexKey{
+				{"task_id", false},
 				{"primary_key", false},
 			},
 			Unique: true,
@@ -105,6 +106,17 @@ func (s *TaskRepository) Indices() []infra.Index {
 		{
 			Name: "task_list_type",
 			Keys: []infra.IndexKey{
+				{"status", false},
+				{"created_at", true},
+			},
+			Unique: false,
+			Sparse: false,
+		},
+		{
+			Name: "task_filter_type",
+			Keys: []infra.IndexKey{
+				{"task_id", false},
+				{"primary_key", false},
 				{"status", false},
 				{"created_at", true},
 			},
@@ -179,6 +191,9 @@ func (s *TaskRepository) GetTask(id string) (*util.Task, error) {
 	byts, err := s.RedisConn.Get(id)
 	if err != nil {
 		return nil, err
+	}
+	if byts == nil {
+		return nil, ErrTaskNotFound
 	}
 
 	task := &util.Task{}
@@ -417,4 +432,141 @@ func (s *TaskRepository) ListByStatusBefore(status util.Status, t time.Time, ski
 	}
 
 	return task, nil
+}
+
+func (s *TaskRepository) List(v map[string]interface{}, startTime, endTime *time.Time, skip, limit int) ([]*util.Task, error) {
+	if s.MongoConn == nil {
+		return nil, ErrMongoNoConnection
+	}
+
+	q := bson.M{}
+	for key, val := range v {
+		q[key] = val
+	}
+
+	if !(startTime == nil || endTime == nil) {
+		q["created_at"] = bson.M{
+			"$gte": startTime,
+			"$lte": endTime,
+		}
+	}
+
+	task := []*util.Task{}
+	cursor, err := s.MongoConn.List(q, skip, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	for cursor.Next(context.Background()) {
+		bTask := &bsonTask{}
+		if err := cursor.Decode(bTask); err != nil {
+			return nil, err
+		}
+
+		task = append(task, formTask(bTask))
+	}
+
+	return task, nil
+}
+
+type bsonTaskDateRangeCount struct {
+	ID              time.Time `bson:"_id"`
+	Total           int       `bson:"total"`
+	CountRetry      int       `bson:"retry"`
+	CountInitiated  int       `bson:"initiated"`
+	CountQueued     int       `bson:"queued"`
+	CountInProgress int       `bson:"in_progress"`
+	CountSuccess    int       `bson:"success"`
+	CountFailed     int       `bson:"failed"`
+}
+
+func formTaskDateRangeCount(t *bsonTaskDateRangeCount) *util.TaskDateRangeCount {
+	return &util.TaskDateRangeCount{
+		ID:              t.ID,
+		Total:           t.Total,
+		CountRetry:      t.CountRetry,
+		CountInitiated:  t.CountInitiated,
+		CountQueued:     t.CountQueued,
+		CountInProgress: t.CountInProgress,
+		CountFailed:     t.CountFailed,
+		CountSuccess:    t.CountSuccess,
+	}
+}
+
+func (s *TaskRepository) ListCountDateRangeInterval(startTime, endTime time.Time, interval int) ([]util.TaskDateRangeCount, error) {
+	bsonCond := func(status string) bson.M {
+		return bson.M{
+			"$sum": bson.M{
+				"$cond": bson.M{
+					"if": bson.M{
+						"$eq": []interface{}{"$status", status},
+					}, "then": 1, "else": 0,
+				},
+			},
+		}
+	}
+
+	bndr := MgoTimeRangeBucketBoundaries(startTime, endTime, interval)
+	q := []bson.M{
+		bson.M{
+			"$match": bson.M{
+				"created_at": bson.M{
+					"$gte": startTime,
+					"$lte": endTime,
+				},
+			},
+		},
+		bson.M{
+			"$bucket": bson.M{
+				"groupBy":    "$created_at",
+				"boundaries": bndr,
+				"default":    "Other",
+				"output": bson.M{
+					"total": bson.M{
+						"$sum": 1,
+					},
+					"retry":       bsonCond("retry"),
+					"initiated":   bsonCond("initiated"),
+					"queued":      bsonCond("queued"),
+					"in_progress": bsonCond("in_progress"),
+					"failed":      bsonCond("failed"),
+					"success":     bsonCond("success"),
+				},
+			},
+		},
+	}
+
+	cursor, err := s.MongoConn.Aggregate(q)
+	if err != nil {
+		return nil, err
+	}
+
+	task := []util.TaskDateRangeCount{}
+
+	for cursor.Next(context.Background()) {
+		bTask := &bsonTaskDateRangeCount{}
+		if err := cursor.Decode(bTask); err != nil {
+			return nil, err
+		}
+
+		task = append(task, *formTaskDateRangeCount(bTask))
+	}
+
+	return task, nil
+}
+
+func MgoTimeRangeBucketBoundaries(startDate, endDate time.Time, interval int) []time.Time {
+	bndr := []time.Time{}
+	bndr = append(bndr, startDate)
+	intlDt := startDate
+	enDt := endDate
+	for {
+		intlDt = intlDt.Add(time.Minute * time.Duration(interval))
+		if intlDt.After(endDate) || intlDt.Equal(endDate) {
+			break
+		}
+		bndr = append(bndr, intlDt)
+	}
+
+	return append(bndr, enDt.AddDate(0, 0, 1))
 }

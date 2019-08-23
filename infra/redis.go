@@ -51,7 +51,15 @@ func (s *RedisClient) Get(key string) ([]byte, error) {
 	}
 	defer conn.Close()
 
-	return redis.Bytes(conn.Do("GET", key))
+	data, err := redis.Bytes(conn.Do("GET", key))
+	if err != nil {
+		if err == redis.ErrNil {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return data, nil
 }
 
 func (s *RedisClient) Create(key string, t []byte) error {

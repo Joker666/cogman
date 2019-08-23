@@ -10,6 +10,7 @@ import (
 	"github.com/Tapfury/cogman/config"
 	"github.com/Tapfury/cogman/infra"
 	"github.com/Tapfury/cogman/repo"
+	"github.com/Tapfury/cogman/rest"
 	"github.com/Tapfury/cogman/util"
 
 	"github.com/streadway/amqp"
@@ -132,6 +133,8 @@ func (s *Server) Start() error {
 		s.running = false
 	}()
 
+	queueName := []string{}
+
 	s.lgr.Debug("ensuring queue")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
 		queue := formQueueName(util.HighPriorityQueue, i)
@@ -140,6 +143,7 @@ func (s *Server) Start() error {
 			return err
 		}
 
+		queueName = append(queueName, queue)
 		s.lgr.Debug(queue + " ensured")
 	}
 
@@ -150,10 +154,22 @@ func (s *Server) Start() error {
 			return err
 		}
 
+		queueName = append(queueName, queue)
 		s.lgr.Debug(queue + " ensured")
 	}
 
 	ctx, stop := context.WithCancel(context.Background())
+
+	restCfg := &rest.RestConfig{
+		AmqpCon:   s.acon,
+		Clnt:      s.retryConn,
+		TaskRep:   s.taskRepo,
+		Lgr:       s.lgr,
+		QueueName: queueName,
+	}
+
+	go rest.StartRestServer(ctx, restCfg)
+	s.lgr.Info("rest server started", util.Object{Key: "port", Val: "8081"})
 
 	go s.Consume(ctx, s.cfg.AMQP.Prefetch)
 
