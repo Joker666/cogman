@@ -3,7 +3,7 @@ package resp
 import (
 	"net/http"
 
-	"github.com/Tapfury/phoneline-api/util"
+	"github.com/Tapfury/cogman/util"
 )
 
 type CogmanError error
