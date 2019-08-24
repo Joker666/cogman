@@ -2,6 +2,7 @@ package config
 
 import "time"
 
+// Config : Cogman API congig
 type Config struct {
 	ConnectionTimeout time.Duration
 	RequestTimeout    time.Duration
@@ -17,6 +18,7 @@ type Config struct {
 	LowPriorityQueueCount  int
 }
 
+// Server : Cogman server config
 type Server struct {
 	ConnectionTimeout time.Duration
 
@@ -25,6 +27,7 @@ type Server struct {
 	AMQP  AMQP
 }
 
+// Client : Cogman client config
 type Client struct {
 	ConnectionTimeout time.Duration
 	RequestTimeout    time.Duration
@@ -36,6 +39,7 @@ type Client struct {
 	ReEnqueue bool
 }
 
+// AMQP : rabbitMQ connection config
 type AMQP struct {
 	URI                    string
 	Exchange               string
@@ -44,17 +48,14 @@ type AMQP struct {
 	Prefetch               int
 }
 
+// Mongo : Mongo connection config
 type Mongo struct {
 	URI string
 	TTL time.Duration
 }
 
+// Redis : Redis connection config
 type Redis struct {
 	URI string
 	TTL time.Duration
-}
-
-type Task struct {
-	Name  string
-	Retry int
 }

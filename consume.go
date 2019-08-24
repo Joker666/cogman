@@ -10,6 +10,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
+// Consume start task consumption
 func (s *Server) Consume(ctx context.Context, prefetch int) {
 	ctx, stop := context.WithCancel(ctx)
 
@@ -31,6 +32,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 
 	s.lgr.Debug("creating channel")
 
+	// create a chanel from amqp connection
 	chnl, err := s.acon.Channel()
 	if err != nil {
 		s.lgr.Error("failed to create channel", err)
@@ -62,6 +64,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 	wg := sync.WaitGroup{}
 	var closeErr error
 
+	// waiting for task response from queue consumer.
 	for {
 		var msg amqp.Delivery
 
@@ -136,6 +139,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		}
 
 		wg.Add(1)
+		// Start processing task
 		go func(wrkr *util.Worker, msg *amqp.Delivery) {
 			defer wg.Done()
 
@@ -161,6 +165,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 	return closeErr
 }
 
+// setConsumer set a consumer for each single queue.
 func (s *Server) setConsumer(ctx context.Context, chnl *amqp.Channel, queue string, mode string, taskPool chan<- amqp.Delivery) {
 	msg, err := chnl.Consume(
 		queue,

@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// StartRestServer intiate a rest server
 func StartRestServer(ctx context.Context, cfg *RestConfig) {
 	if cfg.Port == "" {
 		cfg.Port = ":8081"
@@ -37,6 +38,7 @@ func StartRestServer(ctx context.Context, cfg *RestConfig) {
 	_ = server.Shutdown(ctx)
 }
 
+// list of route
 func getHandler(cfg *RestConfig) http.Handler {
 	hdlr := NewCogmanHandler(cfg)
 

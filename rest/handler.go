@@ -15,6 +15,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
+// RestConfig hold the required fields
 type RestConfig struct {
 	Port string
 
@@ -44,6 +45,7 @@ func (s *cogmanHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
 }
 
+// NewCogmanHandler return a cogmanHandler instance
 func NewCogmanHandler(cfg *RestConfig) *cogmanHandler {
 	return &cogmanHandler{
 		mux: http.NewServeMux(),
@@ -57,6 +59,7 @@ func NewCogmanHandler(cfg *RestConfig) *cogmanHandler {
 	}
 }
 
+// get response with a task object
 func (s *cogmanHandler) get(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
@@ -83,6 +86,7 @@ func (s *cogmanHandler) get(w http.ResponseWriter, r *http.Request) {
 	resp.ServeData(w, r, http.StatusOK, task, nil)
 }
 
+// listTask response with a list of task object
 func (s *cogmanHandler) listTask(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
@@ -111,6 +115,7 @@ func (s *cogmanHandler) listTask(w http.ResponseWriter, r *http.Request) {
 	resp.ServeData(w, r, http.StatusOK, taskList, nil)
 }
 
+// getDaterangecount response with a bucket list of time range
 func (s *cogmanHandler) getDaterangecount(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
@@ -152,6 +157,7 @@ type amqpInfo struct {
 	Queue      []queueInfo
 }
 
+// info response the queue list and their info
 func (s *cogmanHandler) info(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
@@ -187,6 +193,7 @@ type TaskRetry struct {
 	Retry  int    `json: "retry"`
 }
 
+// retry will re initiate a fail job
 func (s *cogmanHandler) retry(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)

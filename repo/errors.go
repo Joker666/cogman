@@ -2,6 +2,7 @@ package repo
 
 import "errors"
 
+// List of repo related errors
 var (
 	ErrTaskNotFound      = errors.New("mongo: task not found")
 	ErrMongoNoConnection = errors.New("mongo: no connection")

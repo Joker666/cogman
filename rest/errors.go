@@ -6,6 +6,7 @@ import (
 	"github.com/Tapfury/cogman/rest/resp"
 )
 
+// list cogman rest api  related errors
 var (
 	ErrInvalidData              resp.CogmanError = errors.New("cogman rest: Invalid data")
 	ErrInvalidMethod            resp.CogmanError = errors.New("cogman rest: Invalid method")

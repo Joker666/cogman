@@ -4,6 +4,7 @@ import "time"
 
 type Status string
 
+// list of task status
 const (
 	StatusRetry      Status = "retry"
 	StatusInitiated  Status = "initiated"
@@ -15,15 +16,18 @@ const (
 
 type TaskPriority string
 
+// list of TaskPriority
 var (
 	TaskPriorityHigh TaskPriority = "High"
 	TaskPriorityLow  TaskPriority = "Low"
 )
 
+// Valid check the task priority
 func (p TaskPriority) Valid() bool {
 	return p == TaskPriorityHigh || p == TaskPriorityLow
 }
 
+// Task field hold the necessary field
 type Task struct {
 	TaskID         string
 	PrimaryKey     string

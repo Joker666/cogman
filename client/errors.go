@@ -2,6 +2,7 @@ package client
 
 import "errors"
 
+// list of client side errors
 var (
 	ErrInvalidPriority   = errors.New("cogman: task priority invalid")
 	ErrNotConnected      = errors.New("cogman: client not connected")
