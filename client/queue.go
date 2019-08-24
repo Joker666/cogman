@@ -46,6 +46,7 @@ func (s *Session) getQueueIndex(taskType util.TaskPriority) (int, error) {
 	return index, nil
 }
 
+// GetQueueName return a available queue name based on task priority
 func (s *Session) GetQueueName(pType util.TaskPriority) (string, error) {
 	name := ""
 	for {

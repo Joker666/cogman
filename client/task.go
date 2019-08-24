@@ -9,7 +9,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func (s *Session) ReEnqueueUnhandledTasksBefore(t time.Time) error {
+func (s *Session) reEnqueueUnhandledTasksBefore(t time.Time) error {
 	limit := 20
 	skip := 0
 
@@ -36,8 +36,9 @@ func (s *Session) ReEnqueueUnhandledTasksBefore(t time.Time) error {
 	return nil
 }
 
-// SendTask sends task t
+// SendTask sends a task to rabbitmq
 func (s *Session) SendTask(t util.Task) error {
+	// Checking taskID. re-enqueued task will be skipped
 	if t.TaskID == "" {
 		t.TaskID = uuid.New().String()
 		if t.OriginalTaskID == "" {
@@ -49,6 +50,7 @@ func (s *Session) SendTask(t util.Task) error {
 		}
 	}
 
+	// Checking AMQP connection. Task will be logged for no connection. Re-enqueued later.
 	s.mu.RLock()
 	if !s.connected {
 		s.lgr.Warn("No connection. Task enqueued.", util.Object{Key: "TaskID", Val: t.TaskID})
@@ -120,19 +122,20 @@ func (s *Session) SendTask(t util.Task) error {
 		if !p.Ack {
 			s.lgr.Warn("Task deliver failed", util.Object{Key: "TaskID", Val: t.TaskID})
 			errs = ErrNotPublished
+			break
 		}
 		s.lgr.Info("Task delivered", util.Object{Key: "TaskID", Val: t.TaskID})
 	case <-done:
 		errs = ErrRequestTimeout
 	}
 
+	// For any kind of error, task will be retried if retry count non zero.
+	// TODO: retry count only reduce for task processing related error.
 	if errs != nil {
 		if orgTask, err := s.taskRepo.GetTask(t.OriginalTaskID); err != nil {
 			s.lgr.Error("failed to get task", err, util.Object{Key: "TaskID", Val: t.OriginalTaskID})
 		} else if orgTask.Retry != 0 {
-			go func() {
-				s.RetryTask(t)
-			}()
+			go s.RetryTask(t)
 		}
 
 		s.taskRepo.UpdateTaskStatus(t.TaskID, util.StatusFailed, errs)
@@ -141,6 +144,7 @@ func (s *Session) SendTask(t util.Task) error {
 	return errs
 }
 
+// RetryTask re-process the task reducing counter by 1
 func (s *Session) RetryTask(t util.Task) error {
 	task := util.Task{
 		Name:           t.Name,
@@ -150,6 +154,7 @@ func (s *Session) RetryTask(t util.Task) error {
 		Status:         util.StatusRetry,
 	}
 
+	// updating original task id counter
 	s.taskRepo.UpdateRetryCount(t.OriginalTaskID, -1)
 	if err := s.SendTask(task); err != nil {
 		s.lgr.Error("failed to retry", err, util.Object{Key: "TaskID", Val: task.TaskID}, util.Object{"OriginalTaskID", task.OriginalTaskID})

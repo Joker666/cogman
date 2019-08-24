@@ -16,6 +16,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
+// Server hold the necessary field for server
 type Server struct {
 	tmu sync.RWMutex
 	mu  sync.Mutex
@@ -36,6 +37,7 @@ type Server struct {
 	connError chan error
 }
 
+// NewServer return a new server instance
 func NewServer(cfg config.Server) (*Server, error) {
 	if cfg.ConnectionTimeout < 0 || cfg.Mongo.TTL < 0 || cfg.Redis.TTL < 0 {
 		return nil, ErrInvalidConfig
@@ -64,6 +66,8 @@ func NewServer(cfg config.Server) (*Server, error) {
 	return srvr, nil
 }
 
+// newRetryClient create a cogman client.
+// fail task in server end will be retired using this.
 func newRetryClient(cfg *config.Server) (*client.Session, error) {
 	clntCfg := config.Client{
 		ConnectionTimeout: cfg.ConnectionTimeout,
@@ -79,6 +83,7 @@ func newRetryClient(cfg *config.Server) (*client.Session, error) {
 	return client.NewSession(clntCfg)
 }
 
+// Register register a task handler. taskName must be unique
 func (s *Server) Register(taskName string, h util.Handler) error {
 	s.lgr.Debug("registering task ", util.Object{Key: "TaskName", Val: taskName})
 
@@ -96,6 +101,7 @@ func (s *Server) Register(taskName string, h util.Handler) error {
 	return nil
 }
 
+// GetTaskHandler return task handler
 func (s *Server) GetTaskHandler(taskName string) util.Handler {
 	s.tmu.RLock()
 	defer s.tmu.RUnlock()
@@ -104,6 +110,7 @@ func (s *Server) GetTaskHandler(taskName string) util.Handler {
 	return s.workers[taskName].Handler()
 }
 
+// Start will star task consumer, mongo & redis connection.
 func (s *Server) Start() error {
 	s.mu.Lock()
 
@@ -168,22 +175,24 @@ func (s *Server) Start() error {
 		QueueName: queueName,
 	}
 
+	// Rest api server
 	go rest.StartRestServer(ctx, restCfg)
 	s.lgr.Info("rest server started", util.Object{Key: "port", Val: "8081"})
 
+	// Task consume
 	go s.Consume(ctx, s.cfg.AMQP.Prefetch)
 
 	s.lgr.Info("server started")
 
-	go func() {
-		_ = s.handleReconnect(ctx)
-	}()
+	// Retry task
+	go s.handleReconnect(ctx)
 
 	<-s.quit
 
 	s.lgr.Debug("found stop signal")
 
-	stop() // stopping reConnection handler & consumer
+	// stopping reConnection handler & consumer
+	stop()
 
 	s.done <- struct{}{}
 
@@ -219,6 +228,7 @@ func ensureQueue(con *amqp.Connection, queue string, taskType util.TaskPriority)
 }
 
 func (s *Server) bootstrap() error {
+	// Mongo connection
 	var mcl *infra.MongoClient
 	if s.cfg.Mongo.URI != "" {
 		s.lgr.Debug("connecting mongodb", util.Object{Key: "uri", Val: s.cfg.Mongo.URI})
@@ -239,12 +249,14 @@ func (s *Server) bootstrap() error {
 		}
 	}
 
+	// Redis connection
 	rcon := infra.NewRedisClient(s.cfg.Redis.URI, s.cfg.Redis.TTL)
 	s.lgr.Debug("pinging redis", util.Object{Key: "uri", Val: s.cfg.Redis.URI})
 	if err := rcon.Ping(); err != nil {
 		s.lgr.Error("failed redis ping", err)
 	}
 
+	// Setting task repository
 	s.taskRepo = repo.NewTaskRepo(rcon, mcl)
 	if err := s.taskRepo.EnsureIndices(); err != nil {
 		return err
@@ -273,6 +285,7 @@ func (s *Server) bootstrap() error {
 	s.lgr.Debug("retry session established")
 	s.retryConn = retryConn
 
+	// Retry connection start
 	if err := s.retryConn.Connect(); err != nil {
 		s.lgr.Error("failed connect retry session", err)
 		return err
@@ -310,6 +323,8 @@ func (s *Server) connect(ctx context.Context) error {
 	return nil
 }
 
+// Stop close all the connection of Cogman server.
+// It should be defer from the method Cogman server initiated
 func (s *Server) Stop() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -329,15 +344,14 @@ func (s *Server) Stop() error {
 	return nil
 }
 
-func (s *Server) handleReconnect(ctx context.Context) error {
-	var err error
+func (s *Server) handleReconnect(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			s.lgr.Warn("Retry stopped")
-			return nil
-		case err = <-s.connError:
-			s.lgr.Error("Error in consumer", err)
+			s.lgr.Warn("Cogman server: Retry stopped")
+			return
+		case err := <-s.connError:
+			s.lgr.Error("Cogman server: Error in consumer", err)
 		}
 
 		s.lgr.Info("Trying to reconnect")
@@ -356,10 +370,11 @@ func (s *Server) handleReconnect(ctx context.Context) error {
 		for {
 			select {
 			case <-done:
-				return err
+				s.lgr.Warn("Cogman server: Failed to retry")
+				return
 			case <-time.After(100 * time.Millisecond):
 			}
-			if err = s.connect(ctx); err == nil {
+			if err := s.connect(ctx); err == nil {
 				go s.Consume(ctx, s.cfg.AMQP.Prefetch)
 				break
 			}

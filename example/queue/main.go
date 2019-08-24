@@ -29,8 +29,6 @@ func main() {
 
 		HighPriorityQueueCount: 2, // Optional. Default value 1
 		LowPriorityQueueCount:  1, // Optional. Default value 1
-
-		ReEnqueue: true, // optional. default false. Mongo connection also needed
 	}
 
 	// StartBackgroud will initiate a client & a server together.

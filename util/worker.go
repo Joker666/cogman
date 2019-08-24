@@ -6,15 +6,25 @@ import (
 	"github.com/streadway/amqp"
 )
 
+// Handler is the task handler stuct interface
+type Handler interface {
+	Do(ctx context.Context, payload []byte) error
+}
+
+// HandlerFunc is a task handler function type
+type HandlerFunc func(ctx context.Context, payload []byte) error
+
+func (h HandlerFunc) Do(ctx context.Context, payload []byte) error {
+	return h(ctx, payload)
+}
+
+// Worker hold the necessary field of task handler
 type Worker struct {
 	taskName string
 	handler  Handler
 }
 
-type Handler interface {
-	Do(ctx context.Context, payload []byte) error
-}
-
+// NewWorker return a new worker instance
 func NewWorker(name string, h Handler) *Worker {
 	return &Worker{
 		taskName: name,
@@ -22,14 +32,17 @@ func NewWorker(name string, h Handler) *Worker {
 	}
 }
 
+// Name return worker name
 func (w *Worker) Name() string {
 	return w.taskName
 }
 
+// Handler return task handler
 func (w *Worker) Handler() Handler {
 	return w.handler
 }
 
+// Process call do method of task handler
 func (w *Worker) Process(msg *amqp.Delivery) error {
 	h := Header{}
 	for k, v := range msg.Headers {
@@ -38,10 +51,4 @@ func (w *Worker) Process(msg *amqp.Delivery) error {
 		}
 	}
 	return w.handler.Do(NewHeaderContext(context.Background(), h), msg.Body)
-}
-
-type HandlerFunc func(ctx context.Context, payload []byte) error
-
-func (h HandlerFunc) Do(ctx context.Context, payload []byte) error {
-	return h(ctx, payload)
 }

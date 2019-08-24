@@ -13,6 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+// TaskRepository contain necessary fields
 type TaskRepository struct {
 	RedisConn *infra.RedisClient
 	MongoConn *infra.MongoClient
@@ -20,6 +21,7 @@ type TaskRepository struct {
 	lgr util.Logger
 }
 
+// NewTaskRepo return a new TaskRepository instance
 func NewTaskRepo(redisCon *infra.RedisClient, mgoCon *infra.MongoClient) *TaskRepository {
 	return &TaskRepository{
 		RedisConn: redisCon,
@@ -29,6 +31,7 @@ func NewTaskRepo(redisCon *infra.RedisClient, mgoCon *infra.MongoClient) *TaskRe
 	}
 }
 
+// CloseClients close connection
 func (s *TaskRepository) CloseClients() {
 	_ = s.RedisConn.Close()
 	_ = s.MongoConn.Close()
@@ -126,14 +129,17 @@ func (s *TaskRepository) Indices() []infra.Index {
 	}
 }
 
+// EnsureIndices ensure listed indices
 func (s *TaskRepository) EnsureIndices() error {
 	return s.MongoConn.EnsureIndices(s.Indices())
 }
 
+// DropIndices drop all the listed indice
 func (s *TaskRepository) DropIndices() error {
 	return s.MongoConn.DropIndices()
 }
 
+// CreateTask create a task object both in redis and mongo
 func (s *TaskRepository) CreateTask(task *util.Task) error {
 	if task.Status != util.StatusRetry {
 		task.Status = util.StatusInitiated
@@ -183,6 +189,7 @@ func (s *TaskRepository) CreateTask(task *util.Task) error {
 	return errs
 }
 
+// GetTask return a id from redis
 func (s *TaskRepository) GetTask(id string) (*util.Task, error) {
 	if s.RedisConn == nil {
 		return nil, ErrRedisNoConnection
@@ -218,6 +225,7 @@ func parseTask(resp *mongo.SingleResult, task *bsonTask) error {
 	return nil
 }
 
+// UpdateTaskStatus update the task status
 func (s *TaskRepository) UpdateTaskStatus(id string, status util.Status, args ...interface{}) {
 	var failError error
 	var duration *float64
@@ -336,6 +344,7 @@ func (s *TaskRepository) UpdateTaskStatus(id string, status util.Status, args ..
 	}
 }
 
+// UpdateRetryCount update task retry count field
 func (s *TaskRepository) UpdateRetryCount(id string, count int) {
 	go func() {
 		var errs error
@@ -404,6 +413,7 @@ func (s *TaskRepository) UpdateRetryCount(id string, count int) {
 	}
 }
 
+// ListByStatusBefore fetch a task list before time t
 func (s *TaskRepository) ListByStatusBefore(status util.Status, t time.Time, skip, limit int) ([]*util.Task, error) {
 	if s.MongoConn == nil {
 		return nil, ErrMongoNoConnection
@@ -434,6 +444,7 @@ func (s *TaskRepository) ListByStatusBefore(status util.Status, t time.Time, ski
 	return task, nil
 }
 
+// List send a task list
 func (s *TaskRepository) List(v map[string]interface{}, startTime, endTime *time.Time, skip, limit int) ([]*util.Task, error) {
 	if s.MongoConn == nil {
 		return nil, ErrMongoNoConnection
@@ -493,6 +504,7 @@ func formTaskDateRangeCount(t *bsonTaskDateRangeCount) *util.TaskDateRangeCount 
 	}
 }
 
+// ListCountDateRangeInterval  send a bucket list
 func (s *TaskRepository) ListCountDateRangeInterval(startTime, endTime time.Time, interval int) ([]util.TaskDateRangeCount, error) {
 	bsonCond := func(status string) bson.M {
 		return bson.M{
@@ -506,7 +518,7 @@ func (s *TaskRepository) ListCountDateRangeInterval(startTime, endTime time.Time
 		}
 	}
 
-	bndr := MgoTimeRangeBucketBoundaries(startTime, endTime, interval)
+	bndr := mgoTimeRangeBucketBoundaries(startTime, endTime, interval)
 	q := []bson.M{
 		bson.M{
 			"$match": bson.M{
@@ -555,7 +567,7 @@ func (s *TaskRepository) ListCountDateRangeInterval(startTime, endTime time.Time
 	return task, nil
 }
 
-func MgoTimeRangeBucketBoundaries(startDate, endDate time.Time, interval int) []time.Time {
+func mgoTimeRangeBucketBoundaries(startDate, endDate time.Time, interval int) []time.Time {
 	bndr := []time.Time{}
 	bndr = append(bndr, startDate)
 	intlDt := startDate

@@ -6,12 +6,14 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
+// RedisClient contain necessary field
 type RedisClient struct {
 	URL    string
 	rcon   *redis.Pool
 	ExpDur int64
 }
 
+// NewRedisClient return a new RedisClient instance
 func NewRedisClient(url string, ttl time.Duration) *RedisClient {
 	return &RedisClient{
 		URL:    url,
@@ -26,6 +28,7 @@ func NewRedisClient(url string, ttl time.Duration) *RedisClient {
 	}
 }
 
+// Ping check the redis connection
 func (s *RedisClient) Ping() error {
 	conn := s.rcon.Get()
 	if conn == nil {
@@ -40,10 +43,12 @@ func (s *RedisClient) Ping() error {
 	return nil
 }
 
+// Close close the redis connection
 func (s *RedisClient) Close() error {
 	return s.rcon.Close()
 }
 
+// Get return a byte string based on key
 func (s *RedisClient) Get(key string) ([]byte, error) {
 	conn := s.rcon.Get()
 	if conn == nil {
@@ -62,6 +67,7 @@ func (s *RedisClient) Get(key string) ([]byte, error) {
 	return data, nil
 }
 
+// Create create a new object
 func (s *RedisClient) Create(key string, t []byte) error {
 	conn := s.rcon.Get()
 	if conn == nil {
@@ -77,6 +83,7 @@ func (s *RedisClient) Create(key string, t []byte) error {
 	return err
 }
 
+// Update will update the object
 func (s *RedisClient) Update(key string, t []byte) error {
 	conn := s.rcon.Get()
 	if conn == nil {

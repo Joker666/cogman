@@ -57,7 +57,7 @@ func NewSession(cfg config.Client) (*Session, error) {
 	}, nil
 }
 
-// Close closes session s
+// Close closes session s. It must be defer from the method client initiated.
 func (s *Session) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -70,20 +70,25 @@ func (s *Session) Close() error {
 	return s.conn.Close()
 }
 
-// Connect connects a client session
+// Connect connects a client session. It also take care reconnection process.
+// For result log, Redis & Mongo connection will be initiated.
+// Mongo indices ensured here. If any conflict occurred, drop the indice table.
 func (s *Session) Connect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// block connection overwritting
 	if s.connected {
 		return nil
 	}
 
+	// redis connection
 	rcon := infra.NewRedisClient(s.cfg.Redis.URI, s.cfg.Redis.TTL)
 	if err := rcon.Ping(); err != nil {
 		return err
 	}
 
+	// mongo connection
 	var mcon *infra.MongoClient
 	if s.cfg.Mongo.URI != "" {
 		con, err := infra.NewMongoClient(s.cfg.Mongo.URI, s.cfg.Mongo.TTL)
@@ -124,20 +129,23 @@ func (s *Session) Connect() error {
 
 	s.connected = true
 
-	go func() {
-		_ = s.handleReconnect()
-	}()
+	// handle reconnection
+	go s.handleReconnect()
 
-	s.reEnqueue() // Re enqueue un handles tasks
+	// Re-enqueue
+	s.reEnqueue()
 
 	return nil
 }
 
+// reEnqueue initiated task from connection lost period.
 func (s *Session) reEnqueue() {
+	// checking client side permission client side
 	if !s.cfg.ReEnqueue {
 		return
 	}
 
+	// mongo connection required
 	if s.taskRepo.MongoConn == nil {
 		s.lgr.Warn("Failed to re-enqueue task. Mongo connection missing")
 		return
@@ -145,12 +153,13 @@ func (s *Session) reEnqueue() {
 
 	nw := time.Now()
 	go func() {
-		if err := s.ReEnqueueUnhandledTasksBefore(nw); err != nil {
+		if err := s.reEnqueueUnhandledTasksBefore(nw); err != nil {
 			s.lgr.Error("Error in re-enqueuing: ", err)
 		}
 	}()
 }
 
+// connection initiate a cogman client above rabbitmq
 func (s *Session) connect(ctx context.Context) error {
 	errCh := make(chan error)
 
@@ -180,13 +189,14 @@ func (s *Session) connect(ctx context.Context) error {
 	return nil
 }
 
-func (s *Session) handleReconnect() error {
-	var err error
+func (s *Session) handleReconnect() {
 	for {
 		select {
 		case <-s.done:
-			return nil
-		case err = <-s.reconn:
+			s.lgr.Info("Cogman Client: Connection closing.")
+			return
+		case err := <-s.reconn:
+			s.lgr.Error("Cogman Client: Connection reconnecting.", err)
 			s.connected = false
 		}
 
@@ -203,11 +213,13 @@ func (s *Session) handleReconnect() error {
 		for {
 			select {
 			case <-done:
-				return err
+				s.lgr.Warn("Cogman Client: failed to reconnect. client closing")
+				return
 			case <-time.After(100 * time.Millisecond):
 			}
-			if err = s.connect(ctx); err == nil {
-				s.reEnqueue() // Re enqueue un handles tasks
+			if err := s.connect(ctx); err == nil {
+				// Re enqueue un handles tasks
+				s.reEnqueue()
 				break
 			}
 		}
