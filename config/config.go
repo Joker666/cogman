@@ -16,6 +16,7 @@ type Config struct {
 
 	HighPriorityQueueCount int
 	LowPriorityQueueCount  int
+	Prefetch               int
 }
 
 // Server : Cogman server config

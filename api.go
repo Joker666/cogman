@@ -93,6 +93,7 @@ func setConfig(cfg *config.Config) (*config.Server, *config.Client, error) {
 		HighPriorityQueueCount: max(1, cfg.HighPriorityQueueCount),
 		LowPriorityQueueCount:  max(1, cfg.LowPriorityQueueCount),
 		Exchange:               "",
+		Prefetch:               cfg.Prefetch,
 	}
 
 	srvrCfg.AMQP = amqp

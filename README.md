@@ -103,8 +103,9 @@ type Task struct {
     TaskID         string       // unique. ID should be assigned by Cogman.
     Name           string       // required. And Task name must be registered with a task handler
     OriginalTaskID string       // a retry task will carry it's parents ID.
-    PrimaryKey     string       // optional. Client can set any key to trace a task. 
+    PrimaryKey     string       // optional. Client can set any key to trace a task.
     Retry          int          // default value 0.
+    Prefetch      int          // optional. Number of task fetch from queue by consumer at a time.
     Payload        []byte       // required
     Priority       TaskPriority // required. High or Low
     Status         Status       // current task status
