@@ -159,7 +159,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 }
 
 // setConsumer set a consumer for each single queue.
-func (s *Server) setConsumer(ctx context.Context, queue, mode string, prefect int, taskPool chan<- amqp.Delivery) {
+func (s *Server) setConsumer(ctx context.Context, queue, mode string, prefetch int, taskPool chan<- amqp.Delivery) {
 	chnl, err := s.acon.Channel()
 	if err != nil {
 		s.lgr.Error("failed to create channel", err)
@@ -170,7 +170,7 @@ func (s *Server) setConsumer(ctx context.Context, queue, mode string, prefect in
 
 	closeNotification := chnl.NotifyClose(make(chan *amqp.Error, 1))
 
-	if err := chnl.Qos(prefect, 0, false); err != nil {
+	if err := chnl.Qos(prefetch, 0, false); err != nil {
 		s.lgr.Error("failed to set qos", err)
 		return
 	}
