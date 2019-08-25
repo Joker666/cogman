@@ -27,38 +27,29 @@ type errorTaskBody struct {
 	err    error
 }
 
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 func (s *Server) consume(ctx context.Context, prefetch int) error {
 	errCh := make(chan errorTaskBody, 1)
 
 	s.lgr.Debug("creating channel")
 
-	// create a chanel from amqp connection
-	chnl, err := s.acon.Channel()
-	if err != nil {
-		s.lgr.Error("failed to create channel", err)
-		return err
-	}
-
-	defer chnl.Close()
-
-	s.lgr.Debug("setting channel qos")
-	if err := chnl.Qos(prefetch, 0, false); err != nil {
-		s.lgr.Error("failed to set qos", err)
-		return err
-	}
-
 	taskPool := make(chan amqp.Delivery)
-	closeNotification := chnl.NotifyClose(make(chan *amqp.Error, 1))
 
 	s.lgr.Debug("creating consumer")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
 		queue := formQueueName(util.HighPriorityQueue, i)
-		go s.setConsumer(ctx, chnl, queue, util.QueueModeDefault, taskPool)
+		go s.setConsumer(ctx, queue, util.QueueModeDefault, maxInt(20, prefetch), taskPool)
 	}
 
 	for i := 0; i < s.cfg.AMQP.LowPriorityQueueCount; i++ {
 		queue := formQueueName(util.LowPriorityQueue, i)
-		go s.setConsumer(ctx, chnl, queue, util.QueueModeLazy, taskPool)
+		go s.setConsumer(ctx, queue, util.QueueModeLazy, maxInt(10, prefetch), taskPool)
 	}
 
 	wg := sync.WaitGroup{}
@@ -71,9 +62,6 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 		done := false
 
 		select {
-		case closeErr := <-closeNotification:
-			s.lgr.Error("Server closed", closeErr)
-			done = true
 		case <-ctx.Done():
 			s.lgr.Debug("task processing stopped")
 			done = true
@@ -102,6 +90,11 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 
 		if done {
 			break
+		}
+
+		if err := msg.Ack(true); err != nil {
+			s.lgr.Warn("fail to ack")
+			continue
 		}
 
 		hdr := msg.Headers
@@ -166,11 +159,26 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 }
 
 // setConsumer set a consumer for each single queue.
-func (s *Server) setConsumer(ctx context.Context, chnl *amqp.Channel, queue string, mode string, taskPool chan<- amqp.Delivery) {
+func (s *Server) setConsumer(ctx context.Context, queue, mode string, prefect int, taskPool chan<- amqp.Delivery) {
+	chnl, err := s.acon.Channel()
+	if err != nil {
+		s.lgr.Error("failed to create channel", err)
+		return
+	}
+
+	defer chnl.Close()
+
+	closeNotification := chnl.NotifyClose(make(chan *amqp.Error, 1))
+
+	if err := chnl.Qos(prefect, 0, false); err != nil {
+		s.lgr.Error("failed to set qos", err)
+		return
+	}
+
 	msg, err := chnl.Consume(
 		queue,
 		"",
-		true,
+		false,
 		false,
 		false,
 		false,
@@ -185,6 +193,9 @@ func (s *Server) setConsumer(ctx context.Context, chnl *amqp.Channel, queue stri
 
 	for {
 		select {
+		case closeErr := <-closeNotification:
+			s.lgr.Error("queue closing", closeErr, util.Object{Key: "queue", Val: queue})
+			return
 		case <-ctx.Done():
 			s.lgr.Debug("queue closing", util.Object{Key: "queue", Val: queue})
 			return
