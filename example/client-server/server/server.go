@@ -17,7 +17,7 @@ func main() {
 		Redis: config.Redis{URI: "redis://localhost:6379/0", TTL: time.Hour},               // required
 		AMQP: config.AMQP{
 			URI:                    "amqp://localhost:5672",
-			HighPriorityQueueCount: 5,  // default
+			HighPriorityQueueCount: 2,  // default
 			LowPriorityQueueCount:  5,  // default
 			Exchange:               "", // Client and Server exchange should be same
 		},

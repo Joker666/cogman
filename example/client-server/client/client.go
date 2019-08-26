@@ -52,18 +52,21 @@ func SendExampleTask(clnt *cogman.Session) error {
 	log.Printf("========================================>")
 	time.Sleep(time.Second * 3)
 
-	task, err := exampletasks.GetAdditionTask(234, 435, util.TaskPriorityHigh, 3)
-	if err != nil {
-		return err
-	}
-	if err := clnt.SendTask(*task); err != nil {
-		return err
+	for i:=0;i<100000;i++{
+		task, err := exampletasks.GetAdditionTask(234, 435, util.TaskPriorityHigh, 3)
+		if err != nil {
+			return err
+		}
+		if err := clnt.SendTask(*task); err != nil {
+			return err
+		}
+
 	}
 
 	time.Sleep(time.Second * 3)
 	log.Print("========================================>")
 
-	task, err = exampletasks.GetSubtractionTask(43, 23, util.TaskPriorityLow, 3)
+	task, err := exampletasks.GetSubtractionTask(43, 23, util.TaskPriorityLow, 3)
 	if err != nil {
 		return err
 	}

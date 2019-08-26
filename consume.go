@@ -92,6 +92,8 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			break
 		}
 
+		time.Sleep(time.Second * 2)
+
 		if err := msg.Ack(true); err != nil {
 			s.lgr.Warn("fail to ack")
 			continue
