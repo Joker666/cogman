@@ -60,8 +60,15 @@ func NewCogmanHandler(cfg *RestConfig) *cogmanHandler {
 	}
 }
 
+func setupResponse(w *http.ResponseWriter, req *http.Request) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+}
+
 // get response with a task object
 func (s *cogmanHandler) get(w http.ResponseWriter, r *http.Request) {
+	setupResponse(&w,r)
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
 		return
@@ -89,6 +96,7 @@ func (s *cogmanHandler) get(w http.ResponseWriter, r *http.Request) {
 
 // listTask response with a list of task object
 func (s *cogmanHandler) listTask(w http.ResponseWriter, r *http.Request) {
+	setupResponse(&w,r)
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
 		return
@@ -122,6 +130,7 @@ func (s *cogmanHandler) getDaterangecount(w http.ResponseWriter, r *http.Request
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
 		return
 	}
+	setupResponse(&w, r)
 
 	v, err := parseDateRangeFilterValues(r)
 	if err != nil {
@@ -156,12 +165,6 @@ type amqpInfo struct {
 	TotalQueue int `json: "total_queue"`
 	TotalTask  int `json: "total_task"`
 	Queue      []queueInfo
-}
-
-func setupResponse(w *http.ResponseWriter, req *http.Request) {
-	(*w).Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
-	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 }
 
 // info response the queue list and their info
