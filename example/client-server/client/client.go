@@ -52,22 +52,28 @@ func SendExampleTask(clnt *cogman.Session) error {
 	log.Printf("========================================>")
 	time.Sleep(time.Second * 3)
 
-	task, err := exampletasks.GetAdditionTask(234, 435, util.TaskPriorityHigh, 3)
-	if err != nil {
-		return err
-	}
-	if err := clnt.SendTask(*task); err != nil {
-		return err
+	intvr := time.Hour * time.Duration(24)
+
+	for i := 0; i < 1000; i++ {
+		tm := time.Now().Add(-intvr)
+
+		task, err := exampletasks.GetAdditionTask(234, 435, util.TaskPriorityHigh, 3)
+		if err != nil {
+			return err
+		}
+		if err := clnt.SendTask(*task, &tm); err != nil {
+			return err
+		}
 	}
 
 	time.Sleep(time.Second * 3)
 	log.Print("========================================>")
 
-	task, err = exampletasks.GetSubtractionTask(43, 23, util.TaskPriorityLow, 3)
+	task, err := exampletasks.GetSubtractionTask(43, 23, util.TaskPriorityLow, 3)
 	if err != nil {
 		return err
 	}
-	if err := clnt.SendTask(*task); err != nil {
+	if err := clnt.SendTask(*task, nil); err != nil {
 		return err
 	}
 
@@ -78,7 +84,7 @@ func SendExampleTask(clnt *cogman.Session) error {
 	if err != nil {
 		return err
 	}
-	if err := clnt.SendTask(*task); err != nil {
+	if err := clnt.SendTask(*task, nil); err != nil {
 		return err
 	}
 

@@ -52,7 +52,7 @@ func SendTask(task util.Task, hdlr util.Handler) error {
 		}
 	}
 
-	return clnt.SendTask(task)
+	return clnt.SendTask(task, nil)
 }
 
 func Register(taskName string, hdlr util.Handler) error {

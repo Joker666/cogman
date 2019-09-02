@@ -140,15 +140,18 @@ func (s *TaskRepository) DropIndices() error {
 }
 
 // CreateTask create a task object both in redis and mongo
-func (s *TaskRepository) CreateTask(task *util.Task) error {
+func (s *TaskRepository) CreateTask(task *util.Task, createdAt *time.Time) error {
 	if task.Status != util.StatusRetry {
 		task.Status = util.StatusInitiated
 	}
 
 	nw := time.Now()
-	task.UpdatedAt = nw
-	task.CreatedAt = nw
+	if createdAt == nil {
+		createdAt = &nw
+	}
 
+	task.UpdatedAt = nw
+	task.CreatedAt = *createdAt
 	go func() {
 		if s.MongoConn == nil {
 			return

@@ -27,7 +27,7 @@ func (s *Session) reEnqueueUnhandledTasksBefore(t time.Time) error {
 		skip += limit
 
 		for _, t := range tasks {
-			if err := s.SendTask(*t); err != nil {
+			if err := s.SendTask(*t, nil); err != nil {
 				return err
 			}
 		}
@@ -37,7 +37,7 @@ func (s *Session) reEnqueueUnhandledTasksBefore(t time.Time) error {
 }
 
 // SendTask sends a task to rabbitmq
-func (s *Session) SendTask(t util.Task) error {
+func (s *Session) SendTask(t util.Task, interval *time.Time) error {
 	// Checking taskID. re-enqueued task will be skipped
 	if t.TaskID == "" {
 		t.TaskID = uuid.New().String()
@@ -45,7 +45,7 @@ func (s *Session) SendTask(t util.Task) error {
 			t.OriginalTaskID = t.TaskID
 		}
 
-		if err := s.taskRepo.CreateTask(&t); err != nil {
+		if err := s.taskRepo.CreateTask(&t, interval); err != nil {
 			return err
 		}
 	}
@@ -156,7 +156,7 @@ func (s *Session) RetryTask(t util.Task) error {
 
 	// updating original task id counter
 	s.taskRepo.UpdateRetryCount(t.OriginalTaskID, -1)
-	if err := s.SendTask(task); err != nil {
+	if err := s.SendTask(task, nil); err != nil {
 		s.lgr.Error("failed to retry", err, util.Object{Key: "TaskID", Val: task.TaskID}, util.Object{"OriginalTaskID", task.OriginalTaskID})
 		return err
 	}
