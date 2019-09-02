@@ -28,5 +28,7 @@ if [ -z "${VERSION}" ]; then
     fi
 fi
 
+export GO111MODULE=on
+
 go mod vendor
-go install -v -ldflags="-X ${REPO_PATH}/version.Version=${VERSION}" ./cmd/...
+go install -v -ldflags="-X ${REPO_PATH}/version.Version=${VERSION}"  ./...

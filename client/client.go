@@ -2,57 +2,114 @@ package client
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
 	"github.com/Tapfury/cogman/config"
-	"github.com/google/uuid"
+	"github.com/Tapfury/cogman/infra"
+	"github.com/Tapfury/cogman/repo"
+	"github.com/Tapfury/cogman/util"
+
 	"github.com/streadway/amqp"
 )
 
-// Session holds necessery fields of a client session
+// Session holds necessary fields of a client session
 type Session struct {
 	cfg *config.Client
 
 	mu        sync.RWMutex
 	connected bool
 
-	conn *amqp.Connection
+	conn     *amqp.Connection
+	taskRepo *repo.TaskRepository
 
 	done   chan struct{}
 	reconn chan *amqp.Error
+
+	lgr        util.Logger
+	queueIndex map[string]int
 }
 
 // NewSession creates new client session with config cfg
 func NewSession(cfg config.Client) (*Session, error) {
-	if cfg.ConnectionTimeout < 0 || cfg.RequestTimeout < 0 {
+	if cfg.ConnectionTimeout < 0 || cfg.RequestTimeout < 0 ||
+		cfg.Mongo.TTL < 0 || cfg.Redis.TTL < 0 {
 		return nil, ErrInvalidConfig
 	}
+
+	if cfg.Mongo.TTL == 0 {
+		cfg.Mongo.TTL = time.Hour * 24 * 30 // 1  month
+	}
+
+	if cfg.Redis.TTL == 0 {
+		cfg.Redis.TTL = time.Hour * 24 * 7 // 1 week
+	}
+
 	return &Session{
 		cfg: &cfg,
+		lgr: util.NewLogger(),
+		queueIndex: map[string]int{
+			util.QueueModeLazy:    0,
+			util.QueueModeDefault: 0,
+		},
+
+		taskRepo: &repo.TaskRepository{},
 	}, nil
 }
 
-// Close closes session s
+// Close closes session s. It must be defer from the method client initiated.
 func (s *Session) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.connected = false
+	s.taskRepo.CloseClients()
 
 	close(s.done)
 
 	return s.conn.Close()
 }
 
-// Connect connects a client session
+// Connect connects a client session. It also take care reconnection process.
+// For result log, Redis & Mongo connection will be initiated.
+// Mongo indices ensured here. If any conflict occurred, drop the indice table.
 func (s *Session) Connect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// block connection overwritting
 	if s.connected {
 		return nil
+	}
+
+	// redis connection
+	rcon := infra.NewRedisClient(s.cfg.Redis.URI, s.cfg.Redis.TTL)
+	if err := rcon.Ping(); err != nil {
+		return err
+	}
+
+	// mongo connection
+	var mcon *infra.MongoClient
+	if s.cfg.Mongo.URI != "" {
+		con, err := infra.NewMongoClient(s.cfg.Mongo.URI, s.cfg.Mongo.TTL)
+		if err != nil {
+			return err
+		}
+
+		if err := con.Ping(); err != nil {
+			return err
+		}
+
+		mcon = con
+		_, err = mcon.SetTTL()
+		if err != nil {
+			return err
+		}
+	}
+
+	s.taskRepo = repo.NewTaskRepo(rcon, mcon)
+	if err := s.taskRepo.EnsureIndices(); err != nil {
+		return err
 	}
 
 	s.done = make(chan struct{})
@@ -72,13 +129,37 @@ func (s *Session) Connect() error {
 
 	s.connected = true
 
-	go func() {
-		s.handleReconnect()
-	}()
+	// handle reconnection
+	go s.handleReconnect()
+
+	// Re-enqueue
+	s.reEnqueue()
 
 	return nil
 }
 
+// reEnqueue initiated task from connection lost period.
+func (s *Session) reEnqueue() {
+	// checking client side permission client side
+	if !s.cfg.ReEnqueue {
+		return
+	}
+
+	// mongo connection required
+	if s.taskRepo.MongoConn == nil {
+		s.lgr.Warn("Failed to re-enqueue task. Mongo connection missing")
+		return
+	}
+
+	nw := time.Now()
+	go func() {
+		if err := s.reEnqueueUnhandledTasksBefore(nw); err != nil {
+			s.lgr.Error("Error in re-enqueuing: ", err)
+		}
+	}()
+}
+
+// connection initiate a cogman client above rabbitmq
 func (s *Session) connect(ctx context.Context) error {
 	errCh := make(chan error)
 
@@ -108,14 +189,14 @@ func (s *Session) connect(ctx context.Context) error {
 	return nil
 }
 
-func (s *Session) handleReconnect() error {
-
-	var err error
+func (s *Session) handleReconnect() {
 	for {
 		select {
 		case <-s.done:
-			return nil
-		case err = <-s.reconn:
+			s.lgr.Info("Cogman Client: Connection closing.")
+			return
+		case err := <-s.reconn:
+			s.lgr.Error("Cogman Client: Connection reconnecting.", err)
 			s.connected = false
 		}
 
@@ -132,10 +213,13 @@ func (s *Session) handleReconnect() error {
 		for {
 			select {
 			case <-done:
-				return err
+				s.lgr.Warn("Cogman Client: failed to reconnect. client closing")
+				return
 			case <-time.After(100 * time.Millisecond):
 			}
-			if err = s.connect(ctx); err == nil {
+			if err := s.connect(ctx); err == nil {
+				// Re enqueue un handles tasks
+				s.reEnqueue()
 				break
 			}
 		}
@@ -144,86 +228,4 @@ func (s *Session) handleReconnect() error {
 
 		s.connected = true
 	}
-}
-
-// Task represents a task
-type Task struct {
-	Name    string
-	Payload []byte
-
-	id string
-}
-
-// ID returns the task id
-func (t *Task) ID() string {
-	return t.id
-}
-
-// List of available errors
-var (
-	ErrNotConnected      = errors.New("cogman: client not connected")
-	ErrNotPublished      = errors.New("cogman: task not published")
-	ErrInvalidConfig     = errors.New("cogman: invalid client config")
-	ErrRequestTimeout    = errors.New("cogman: request timeout")
-	ErrConnectionTimeout = errors.New("cogman: connection timeout")
-)
-
-// SendTask sends task t
-func (s *Session) SendTask(t *Task) error {
-	s.mu.RLock()
-	if !s.connected {
-		return ErrNotConnected
-	}
-	s.mu.RUnlock()
-
-	ch, err := s.conn.Channel()
-	if err != nil {
-		return err
-	}
-	defer ch.Close()
-
-	if err := ch.Confirm(false); err != nil {
-		return err
-	}
-
-	id := uuid.New().String()
-
-	close := ch.NotifyClose(make(chan *amqp.Error))
-	publish := ch.NotifyPublish(make(chan amqp.Confirmation))
-
-	err = ch.Publish(
-		s.cfg.AMQP.Exchange,
-		s.cfg.AMQP.Queue,
-		false,
-		false,
-		amqp.Publishing{
-			Type:         t.Name,
-			MessageId:    id,
-			DeliveryMode: amqp.Persistent,
-			Body:         t.Payload,
-		},
-	)
-	if err != nil {
-		return err
-	}
-
-	done := (<-chan time.Time)(make(chan time.Time))
-	if s.cfg.RequestTimeout != 0 {
-		done = time.After(s.cfg.RequestTimeout)
-	}
-
-	select {
-	case err := <-close:
-		return err
-	case p := <-publish:
-		if !p.Ack {
-			return ErrNotPublished
-		}
-	case <-done:
-		return ErrRequestTimeout
-	}
-
-	t.id = id
-
-	return nil
 }
