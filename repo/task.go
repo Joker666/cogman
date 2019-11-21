@@ -87,12 +87,13 @@ func formTask(t *bsonTask) *util.Task {
 	}
 }
 
+// Indices are indices
 func (s *TaskRepository) Indices() []infra.Index {
 	return []infra.Index{
 		{
 			Name: "task_id_type",
 			Keys: []infra.IndexKey{
-				{"task_id", false},
+				{Key: "task_id", Desc: false},
 			},
 			Unique: true,
 			Sparse: false,
@@ -100,8 +101,8 @@ func (s *TaskRepository) Indices() []infra.Index {
 		{
 			Name: "primary_key_type",
 			Keys: []infra.IndexKey{
-				{"task_id", false},
-				{"primary_key", false},
+				{Key: "task_id", Desc: false},
+				{Key: "primary_key", Desc: false},
 			},
 			Unique: true,
 			Sparse: false,
@@ -109,8 +110,8 @@ func (s *TaskRepository) Indices() []infra.Index {
 		{
 			Name: "task_list_type",
 			Keys: []infra.IndexKey{
-				{"status", false},
-				{"created_at", true},
+				{Key: "status", Desc: false},
+				{Key: "created_at", Desc: true},
 			},
 			Unique: false,
 			Sparse: false,
@@ -118,10 +119,10 @@ func (s *TaskRepository) Indices() []infra.Index {
 		{
 			Name: "task_filter_type",
 			Keys: []infra.IndexKey{
-				{"task_id", false},
-				{"primary_key", false},
-				{"status", false},
-				{"created_at", true},
+				{Key: "task_id", Desc: false},
+				{Key: "primary_key", Desc: false},
+				{Key: "status", Desc: false},
+				{Key: "created_at", Desc: true},
 			},
 			Unique: false,
 			Sparse: false,
@@ -300,7 +301,7 @@ func (s *TaskRepository) UpdateTaskStatus(id string, status util.Status, args ..
 			}
 		}
 
-		s.lgr.Error("failed to update task", errs, util.Object{Key: "TaskID", Val: id}, util.Object{"Status", status})
+		s.lgr.Error("failed to update task", errs, util.Object{Key: "TaskID", Val: id}, util.Object{Key: "Status", Val: status})
 	}()
 
 	var errs error
@@ -340,7 +341,7 @@ func (s *TaskRepository) UpdateTaskStatus(id string, status util.Status, args ..
 	}()
 
 	if errs != nil {
-		s.lgr.Error("failed to update task", errs, util.Object{Key: "TaskID", Val: id}, util.Object{"Status", status})
+		s.lgr.Error("failed to update task", errs, util.Object{Key: "TaskID", Val: id}, util.Object{Key: "Status", Val: status})
 	}
 }
 
