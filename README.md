@@ -185,10 +185,10 @@ After Server reconnect, it will start to consume task without losing any task.
 Re-enqueue feature to recover all the initiated task those are lost for connection error. If client somehow lost the amqp connection, Cogman can still take the task in offline. All offline task will be re-queue after connection re-established. Cogman fetch all the offline task from mongo logs, and re-initiate them. Mongo connection required here. For re-enqueuing, task retry count wont be changed.
 
 #### Implementation
-- [Simple use](https://github.com/Tapfury/cogman/tree/example/example/simple)
-- [Queue type](https://github.com/Tapfury/cogman/tree/example/example/queue)
-- [Client & Server](https://github.com/Tapfury/cogman/tree/example/example/client-server)
-- [Task & Task Handler](https://github.com/Tapfury/cogman/tree/example/example/tasks)
+- [Simple use](https://github.com/Tapfury/cogman/tree/master/example/simple)
+- [Queue type](https://github.com/Tapfury/cogman/tree/master/example/queue)
+- [Client & Server](https://github.com/Tapfury/cogman/tree/master/example/client-server)
+- [Task & Task Handler](https://github.com/Tapfury/cogman/tree/master/example/tasks)
 
 
 ### Feature Comparison
