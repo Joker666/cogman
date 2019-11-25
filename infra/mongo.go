@@ -20,6 +20,7 @@ type MongoClient struct {
 	URL    string
 	ExpDur int32
 	mcl    *mongo.Client
+	sess   map[string]mongo.Session
 }
 
 // NewMongoClient return a mongo client
@@ -37,20 +38,41 @@ func NewMongoClient(url string, ttl time.Duration) (*MongoClient, error) {
 		URL:    url,
 		ExpDur: int32(ttl.Seconds()),
 		mcl:    conn,
+		sess:   make(map[string]mongo.Session),
 	}, nil
 }
 
-// Ping check the mongo connectionstatus
-func (s *MongoClient) Ping() error {
-	return s.mcl.Ping(context.Background(), readpref.Primary())
+func (m *MongoClient) StartTransaction(id string) (interface{}, error) {
+	sess, err := m.mcl.StartSession()
+	if err != nil {
+		return nil, err
+	}
+
+	m.sess[id] = sess
+	return nil, m.sess[id].StartTransaction()
+}
+
+func (m *MongoClient) CommitTransaction(id string, ctx context.Context) (interface{}, error) {
+	err := m.sess[id].CommitTransaction(ctx)
+	if err != nil {
+		return nil, err
+	}
+	m.sess[id].EndSession(ctx)
+	delete(m.sess, id)
+	return nil, nil
+}
+
+// Ping check the mongo connection status
+func (m *MongoClient) Ping() error {
+	return m.mcl.Ping(context.Background(), readpref.Primary())
 }
 
 // SetTTL for mongo object
-func (s *MongoClient) SetTTL() (interface{}, error) {
+func (m *MongoClient) SetTTL() (interface{}, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	col, err := s.getCollection()
+	col, err := m.getCollection()
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +81,7 @@ func (s *MongoClient) SetTTL() (interface{}, error) {
 
 	opts := &options.IndexOptions{}
 	opts.SetName("TTL")
-	opts.SetExpireAfterSeconds(s.ExpDur)
+	opts.SetExpireAfterSeconds(m.ExpDur)
 
 	model := mongo.IndexModel{
 		Keys: bson.D{
@@ -111,11 +133,11 @@ func (i *Index) model() mongo.IndexModel {
 }
 
 // EnsureIndices ensure mongo index list
-func (s *MongoClient) EnsureIndices(indices []Index) error {
+func (m *MongoClient) EnsureIndices(indices []Index) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	col, err := s.getCollection()
+	col, err := m.getCollection()
 	if err != nil {
 		return err
 	}
@@ -133,11 +155,11 @@ func (s *MongoClient) EnsureIndices(indices []Index) error {
 }
 
 // DropIndices drop previous mongo field
-func (s *MongoClient) DropIndices() error {
+func (m *MongoClient) DropIndices() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	col, err := s.getCollection()
+	col, err := m.getCollection()
 	if err != nil {
 		return err
 	}
@@ -147,29 +169,29 @@ func (s *MongoClient) DropIndices() error {
 }
 
 // Close close the mongo connection
-func (s *MongoClient) Close() error {
-	return s.mcl.Disconnect(context.Background())
+func (m *MongoClient) Close() error {
+	return m.mcl.Disconnect(context.Background())
 }
 
 // Connect initiate a mongo connection
-func (s *MongoClient) Connect() error {
-	err := s.mcl.Connect(context.Background())
+func (m *MongoClient) Connect() error {
+	err := m.mcl.Connect(context.Background())
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *MongoClient) getCollection() (*mongo.Collection, error) {
-	return s.mcl.Database(database).Collection(tableTasks), nil
+func (m *MongoClient) getCollection() (*mongo.Collection, error) {
+	return m.mcl.Database(database).Collection(tableTasks), nil
 }
 
 // Get return a single object based on query parameter
-func (s *MongoClient) Get(q bson.M) (*mongo.SingleResult, error) {
+func (m *MongoClient) Get(q bson.M) (*mongo.SingleResult, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	col, err := s.getCollection()
+	col, err := m.getCollection()
 	if err != nil {
 		return nil, err
 	}
@@ -183,11 +205,11 @@ func (s *MongoClient) Get(q bson.M) (*mongo.SingleResult, error) {
 }
 
 // Create create a object
-func (s *MongoClient) Create(t interface{}) error {
+func (m *MongoClient) Create(t interface{}) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	col, err := s.getCollection()
+	col, err := m.getCollection()
 	if err != nil {
 		return err
 	}
@@ -197,11 +219,11 @@ func (s *MongoClient) Create(t interface{}) error {
 }
 
 // Update update a object
-func (s *MongoClient) Update(q, val interface{}) error {
+func (m *MongoClient) Update(q, val interface{}) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	col, err := s.getCollection()
+	col, err := m.getCollection()
 	if err != nil {
 		return err
 	}
@@ -218,11 +240,11 @@ func (s *MongoClient) Update(q, val interface{}) error {
 }
 
 // UpdatePartial update a object partially
-func (s *MongoClient) UpdatePartial(q, val interface{}) error {
+func (m *MongoClient) UpdatePartial(q, val interface{}) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	col, err := s.getCollection()
+	col, err := m.getCollection()
 	if err != nil {
 		return err
 	}
@@ -239,11 +261,11 @@ func (s *MongoClient) UpdatePartial(q, val interface{}) error {
 }
 
 // List return a list of object based on query parameter
-func (s *MongoClient) List(q interface{}, skip, limit int) (*mongo.Cursor, error) {
+func (m *MongoClient) List(q interface{}, skip, limit int) (*mongo.Cursor, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	col, err := s.getCollection()
+	col, err := m.getCollection()
 	if err != nil {
 		return nil, err
 	}
@@ -261,11 +283,11 @@ func (s *MongoClient) List(q interface{}, skip, limit int) (*mongo.Cursor, error
 }
 
 // Aggregate return a Cursor
-func (s *MongoClient) Aggregate(q interface{}) (*mongo.Cursor, error) {
+func (m *MongoClient) Aggregate(q interface{}) (*mongo.Cursor, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	col, err := s.getCollection()
+	col, err := m.getCollection()
 	if err != nil {
 		return nil, err
 	}

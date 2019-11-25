@@ -256,49 +256,56 @@ func (s *TaskRepository) UpdateTaskStatus(id string, status util.Status, args ..
 		}
 		task := &bsonTask{}
 
-		numA, numB := int64(0), int64(1)
+		if s.MongoConn == nil {
+			return
+		}
 
-		for i := 0; i < 6; i++ {
-			time.Sleep(time.Second * time.Duration(numB))
-			numB, numA = nextFibonacciNumber(numA, numB), numB
-
-			if s.MongoConn == nil {
+		errs = nil
+		func() {
+			trxID := util.GenerateRandStr(10)
+			_, err := s.MongoConn.StartTransaction(trxID)
+			if err != nil {
+				errs = err
 				return
 			}
 
-			errs = nil
-			func() {
-				resp, err := s.MongoConn.Get(q)
-				if err != nil {
-					errs = err
-					return
-				}
-
-				if err := parseTask(resp, task); err != nil {
-					errs = err
-					return
-				}
-
-				if !status.CheckStatusOrder(util.Status(task.Status)) {
-					return
-				}
-
-				task.Status = string(status)
-				task.UpdatedAt = time.Now()
-				task.Duration = duration
-				task.FailError = ""
-				if failError != nil {
-					task.FailError = failError.Error()
-				}
-
-				if err = s.MongoConn.Update(q, task); err != nil {
-					errs = err
-				}
-			}()
-
-			if errs == nil {
+			resp, err := s.MongoConn.Get(q)
+			if err != nil {
+				errs = err
 				return
 			}
+
+			if err := parseTask(resp, task); err != nil {
+				errs = err
+				return
+			}
+
+			if !status.CheckStatusOrder(util.Status(task.Status)) ||
+				(task.Status == string(util.StatusSuccess) || task.Status == string(util.StatusFailed)) {
+				return
+			}
+
+			task.Status = string(status)
+			task.UpdatedAt = time.Now()
+			task.Duration = duration
+			task.FailError = ""
+			if failError != nil {
+				task.FailError = failError.Error()
+			}
+
+			if err = s.MongoConn.Update(q, task); err != nil {
+				errs = err
+			}
+
+			_, err = s.MongoConn.CommitTransaction(trxID, context.Background())
+			if err != nil {
+				errs = err
+				return
+			}
+		}()
+
+		if errs == nil {
+			return
 		}
 
 		s.lgr.Error("failed to update task", errs, util.Object{Key: "TaskID", Val: id}, util.Object{Key: "Status", Val: status})
