@@ -146,7 +146,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 				}
 				return
 			}
-			duration := float64(time.Since(startAt)) / float64(time.Minute)
+			duration := float64(time.Since(startAt)) / float64(time.Second)
 
 			s.taskRepo.UpdateTaskStatus(taskID, util.StatusSuccess, duration)
 
