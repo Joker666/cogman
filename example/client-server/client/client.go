@@ -36,8 +36,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := SendExampleTask(clnt); err != nil {
-		log.Fatal(err)
+	for i := 0; i < 1000; i++ {
+		if err := SendExampleTask(clnt); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	end := time.After(time.Second * 3)
@@ -50,7 +52,6 @@ func main() {
 
 func SendExampleTask(clnt *cogman.Session) error {
 	log.Printf("========================================>")
-	time.Sleep(time.Second * 3)
 
 	task, err := exampletasks.GetAdditionTask(234, 435, util.TaskPriorityHigh, 3)
 	if err != nil {
@@ -60,7 +61,6 @@ func SendExampleTask(clnt *cogman.Session) error {
 		return err
 	}
 
-	time.Sleep(time.Second * 3)
 	log.Print("========================================>")
 
 	task, err = exampletasks.GetSubtractionTask(43, 23, util.TaskPriorityLow, 3)
@@ -71,7 +71,6 @@ func SendExampleTask(clnt *cogman.Session) error {
 		return err
 	}
 
-	time.Sleep(time.Second * 3)
 	log.Print("========================================>")
 
 	task, err = exampletasks.GetMultiplicationTask(2, 24, util.TaskPriorityHigh, 3)
