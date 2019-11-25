@@ -77,7 +77,7 @@ func (s *Session) Connect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// block connection overwritting
+	// block connection overriding
 	if s.connected {
 		return nil
 	}

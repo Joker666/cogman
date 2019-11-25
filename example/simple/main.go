@@ -18,7 +18,7 @@ func main() {
 		RedisURI: "redis://localhost:6379/0", // required
 	}
 
-	// StartBackgroud will initiate a client & a server together.
+	// StartBackground will initiate a client & a server together.
 	// Both client & server will retry if a task fails.
 	// Task will be re-enqueued (ReEnqueue: true) from client
 	// if client can not deliver it to amqp for any issues.
@@ -49,7 +49,7 @@ func main() {
 
 	// task can be registered before hand using register api.
 	handler = exampletasks.NewSumTask()
-	cogman.Register(exampletasks.TaskAddition, handler)
+	err = cogman.Register(exampletasks.TaskAddition, handler)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -84,14 +84,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	close()
+	finish()
 }
 
-func close() {
-	close := time.After(time.Second * 3)
-	<-close
+func finish() {
+	end := time.After(time.Second * 3)
+	<-end
 
 	log.Print("[x] press ctrl + c to terminate the program")
 
-	<-close
+	<-end
 }

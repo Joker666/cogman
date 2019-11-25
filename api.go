@@ -12,7 +12,6 @@ import (
 var (
 	srvr    *Server
 	clnt    *client.Session
-	errChan chan error
 )
 
 func StartBackground(cfg *config.Config) error {
@@ -107,15 +106,15 @@ func setConfig(cfg *config.Config) (*config.Server, *config.Client, error) {
 		cfg.RedisTTL = time.Hour * 24 * 7 // 1 week
 	}
 
-	srvrCfg.Redis = config.Redis{cfg.RedisURI, cfg.RedisTTL}
-	clntCfg.Redis = config.Redis{cfg.RedisURI, cfg.RedisTTL}
+	srvrCfg.Redis = config.Redis{URI: cfg.RedisURI, TTL: cfg.RedisTTL}
+	clntCfg.Redis = config.Redis{URI: cfg.RedisURI, TTL: cfg.RedisTTL}
 
 	if cfg.MongoTTL == 0 {
 		cfg.MongoTTL = time.Hour * 24 * 30 // 1  month
 	}
 
-	srvrCfg.Mongo = config.Mongo{cfg.MongoURI, cfg.MongoTTL}
-	clntCfg.Mongo = config.Mongo{cfg.MongoURI, cfg.MongoTTL}
+	srvrCfg.Mongo = config.Mongo{URI: cfg.MongoURI, TTL: cfg.MongoTTL}
+	clntCfg.Mongo = config.Mongo{URI: cfg.MongoURI, TTL: cfg.MongoTTL}
 
 	return srvrCfg, clntCfg, nil
 }
