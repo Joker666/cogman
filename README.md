@@ -205,7 +205,7 @@ Comparison among the other job/task process runner.
 | Delayed jobs             |             | ✓             |
 | Concurrent client/server |      ✓      |               |
 | Re-try                   |      ✓      | ✓             |
-| Persistence              |      ✓      |               |
+| Persistence              |      ✓      | ✓             |
 | UI                       |             |               |
 | Rest API                 |      ✓      |               |
 | Chain                    |             | ✓             |
