@@ -256,10 +256,12 @@ func (s *Server) bootstrap() error {
 		s.lgr.Error("failed redis ping", err)
 	}
 
-	// Setting task repository
 	s.taskRepo = repo.NewTaskRepo(rcon, mcl)
-	if err := s.taskRepo.EnsureIndices(); err != nil {
-		return err
+	if s.cfg.Mongo.URI != "" {
+		// Setting task repository
+		if err := s.taskRepo.EnsureIndices(); err != nil {
+			return err
+		}
 	}
 
 	ctx := context.Background()
