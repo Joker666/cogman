@@ -2,6 +2,7 @@ package infra
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -20,7 +21,7 @@ type MongoClient struct {
 	URL    string
 	ExpDur int32
 	mcl    *mongo.Client
-	sess   map[string]mongo.Session
+	sess   sync.Map
 }
 
 // NewMongoClient return a mongo client
@@ -38,7 +39,6 @@ func NewMongoClient(url string, ttl time.Duration) (*MongoClient, error) {
 		URL:    url,
 		ExpDur: int32(ttl.Seconds()),
 		mcl:    conn,
-		sess:   make(map[string]mongo.Session),
 	}, nil
 }
 
@@ -48,17 +48,21 @@ func (m *MongoClient) StartTransaction(id string) (interface{}, error) {
 		return nil, err
 	}
 
-	m.sess[id] = sess
-	return nil, m.sess[id].StartTransaction()
+	m.sess.Store(id, sess)
+	return nil, sess.StartTransaction()
 }
 
 func (m *MongoClient) CommitTransaction(id string, ctx context.Context) (interface{}, error) {
-	err := m.sess[id].CommitTransaction(ctx)
-	if err != nil {
-		return nil, err
+	result, ok := m.sess.Load(id)
+	if ok {
+		sess := result.(mongo.Session)
+		err := sess.CommitTransaction(ctx)
+		if err != nil {
+			return nil, err
+		}
+		sess.EndSession(ctx)
+		m.sess.Delete(id)
 	}
-	m.sess[id].EndSession(ctx)
-	delete(m.sess, id)
 	return nil, nil
 }
 
