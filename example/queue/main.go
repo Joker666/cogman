@@ -31,7 +31,7 @@ func main() {
 		LowPriorityQueueCount:  1, // Optional. Default value 1
 	}
 
-	// StartBackgroud will initiate a client & a server together.
+	// StartBackground will initiate a client & a server together.
 	// Both client & server will retry if a task fails.
 	// Task will be re-enqueued (ReEnqueue: true) from client
 	// if client can not deliver it to amqp for any issues.
@@ -44,8 +44,8 @@ func main() {
 	// Any number of task handler can be register
 	// Task name must be unique
 
-	cogman.Register(exampletasks.TaskAddition, exampletasks.NewSumTask())
-	cogman.Register(exampletasks.TaskSubtraction, exampletasks.NewSubTask())
+	_ = cogman.Register(exampletasks.TaskAddition, exampletasks.NewSumTask())
+	_ = cogman.Register(exampletasks.TaskSubtraction, exampletasks.NewSubTask())
 
 	time.Sleep(time.Second * 3)
 	log.Print("========================================>")
@@ -69,14 +69,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	close()
+	finish()
 }
 
-func close() {
-	close := time.After(time.Second * 3)
-	<-close
+func finish() {
+	end := time.After(time.Second * 3)
+	<-end
 
 	log.Print("[x] press ctrl + c to terminate the program")
 
-	<-close
+	<-end
 }

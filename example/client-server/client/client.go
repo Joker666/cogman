@@ -40,12 +40,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	close := time.After(time.Second * 3)
-	<-close
+	end := time.After(time.Second * 3)
+	<-end
 
 	log.Print("[x] press ctrl + c to terminate the program")
 
-	<-close
+	<-end
 }
 
 func SendExampleTask(clnt *cogman.Session) error {

@@ -36,11 +36,11 @@ func main() {
 	}()
 
 	// Task handler register
-	srvr.Register(exampletasks.TaskAddition, exampletasks.NewSumTask())
-	srvr.Register(exampletasks.TaskSubtraction, exampletasks.NewSubTask())
-	srvr.Register(exampletasks.TaskMultiplication, exampletasks.NewMulTask())
+	_ = srvr.Register(exampletasks.TaskAddition, exampletasks.NewSumTask())
+	_ = srvr.Register(exampletasks.TaskSubtraction, exampletasks.NewSubTask())
+	_ = srvr.Register(exampletasks.TaskMultiplication, exampletasks.NewMulTask())
 
 	log.Print("[x] press ctrl + c to terminate the program")
-	close := make(chan struct{})
-	<-close
+	end := make(chan struct{})
+	<-end
 }
