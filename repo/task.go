@@ -135,7 +135,7 @@ func (s *TaskRepository) EnsureIndices() error {
 	return s.MongoConn.EnsureIndices(s.Indices())
 }
 
-// DropIndices drop all the listed indice
+// DropIndices drop all the listed indices
 func (s *TaskRepository) DropIndices() error {
 	return s.MongoConn.DropIndices()
 }

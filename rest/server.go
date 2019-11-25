@@ -43,7 +43,7 @@ func getHandler(cfg *RestConfig) http.Handler {
 	hdlr := NewCogmanHandler(cfg)
 
 	hdlr.mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "Hello, Cogman alive!!!")
+		_, _ = fmt.Fprint(w, "Hello, Cogman alive!!!")
 	})
 
 	hdlr.mux.HandleFunc("/get", hdlr.get)

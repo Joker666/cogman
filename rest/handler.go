@@ -59,8 +59,15 @@ func NewCogmanHandler(cfg *RestConfig) *cogmanHandler {
 	}
 }
 
+func setupResponse(w *http.ResponseWriter, req *http.Request) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+}
+
 // get response with a task object
 func (s *cogmanHandler) get(w http.ResponseWriter, r *http.Request) {
+	setupResponse(&w, r)
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
 		return
@@ -88,6 +95,7 @@ func (s *cogmanHandler) get(w http.ResponseWriter, r *http.Request) {
 
 // listTask response with a list of task object
 func (s *cogmanHandler) listTask(w http.ResponseWriter, r *http.Request) {
+	setupResponse(&w, r)
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
 		return
@@ -117,6 +125,7 @@ func (s *cogmanHandler) listTask(w http.ResponseWriter, r *http.Request) {
 
 // getDaterangecount response with a bucket list of time range
 func (s *cogmanHandler) getDaterangecount(w http.ResponseWriter, r *http.Request) {
+	setupResponse(&w, r)
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
 		return
@@ -159,6 +168,7 @@ type amqpInfo struct {
 
 // info response the queue list and their info
 func (s *cogmanHandler) info(w http.ResponseWriter, r *http.Request) {
+	setupResponse(&w, r)
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
 		return
@@ -195,6 +205,7 @@ type TaskRetry struct {
 
 // retry will re initiate a fail job
 func (s *cogmanHandler) retry(w http.ResponseWriter, r *http.Request) {
+	setupResponse(&w, r)
 	if r.Method != http.MethodPost {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
 		return
