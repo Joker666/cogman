@@ -108,8 +108,11 @@ func (s *Session) Connect() error {
 	}
 
 	s.taskRepo = repo.NewTaskRepo(rcon, mcon)
-	if err := s.taskRepo.EnsureIndices(); err != nil {
-		return err
+
+	if s.cfg.Mongo.URI != "" {
+		if err := s.taskRepo.EnsureIndices(); err != nil {
+			return err
+		}
 	}
 
 	s.done = make(chan struct{})
