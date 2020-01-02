@@ -46,12 +46,12 @@ type Task struct {
 // CheckStatusOrder check if status st can be updated by status p
 func (p Status) CheckStatusOrder(st Status) bool {
 	val := map[Status]int{
-		StatusRetry:      0,
 		StatusInitiated:  1,
 		StatusQueued:     2,
 		StatusInProgress: 3,
-		StatusFailed:     4,
-		StatusSuccess:    4,
+		StatusRetry:      4,
+		StatusFailed:     5,
+		StatusSuccess:    5,
 	}
 
 	return val[p] > val[st]

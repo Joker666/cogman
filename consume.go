@@ -84,7 +84,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 				}
 			}()
 
-			s.taskRepo.UpdateTaskStatus(errTask.taskID, errTask.status, errTask.err)
+			s.taskRepo.UpdateTaskStatus(ctx, errTask.taskID, errTask.status, errTask.err)
 			continue
 		}
 
@@ -109,7 +109,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			continue
 		}
 
-		s.taskRepo.UpdateTaskStatus(taskID, util.StatusInProgress)
+		s.taskRepo.UpdateTaskStatus(ctx, taskID, util.StatusInProgress)
 
 		taskName, ok := hdr["TaskName"].(string)
 		if !ok {
@@ -148,7 +148,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			}
 			duration := float64(time.Since(startAt)) / float64(time.Second)
 
-			s.taskRepo.UpdateTaskStatus(taskID, util.StatusSuccess, duration)
+			s.taskRepo.UpdateTaskStatus(ctx, taskID, util.StatusSuccess, duration)
 
 		}(wrkr, &msg)
 	}

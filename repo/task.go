@@ -154,13 +154,15 @@ func (s *TaskRepository) CreateTask(task *util.Task) error {
 		if s.MongoConn == nil {
 			return
 		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		t := prepareBsonTask(task)
 		if t.ID.IsZero() {
 			t.ID = primitive.NewObjectID()
 		}
 
-		err := s.MongoConn.Create(t)
+		err := s.MongoConn.Create(ctx, t)
 		if err != nil {
 			s.lgr.Error("failed to create task", err)
 		}
@@ -227,7 +229,7 @@ func parseTask(resp *mongo.SingleResult, task *bsonTask) error {
 }
 
 // UpdateTaskStatus update the task status
-func (s *TaskRepository) UpdateTaskStatus(id string, status util.Status, args ...interface{}) {
+func (s *TaskRepository) UpdateTaskStatus(ctx context.Context, id string, status util.Status, args ...interface{}) {
 	var failError error
 	var duration *float64
 
@@ -247,10 +249,8 @@ func (s *TaskRepository) UpdateTaskStatus(id string, status util.Status, args ..
 		}
 		duration = &dur
 	}
-
 	go func() {
 		var errs error
-
 		q := bson.M{
 			"task_id": id,
 		}
@@ -259,29 +259,31 @@ func (s *TaskRepository) UpdateTaskStatus(id string, status util.Status, args ..
 		if s.MongoConn == nil {
 			return
 		}
-
 		errs = nil
 		func() {
+			var err error
 			trxID := util.GenerateRandStr(10)
-			_, err := s.MongoConn.StartTransaction(trxID)
+			ctx, err = s.MongoConn.StartTransaction(ctx, trxID)
 			if err != nil {
 				errs = err
 				return
 			}
 
-			resp, err := s.MongoConn.Get(q)
+			resp, err := s.MongoConn.Get(ctx, q)
 			if err != nil {
 				errs = err
+				_, _ = s.MongoConn.AbortTransaction(ctx)
 				return
 			}
 
 			if err := parseTask(resp, task); err != nil {
 				errs = err
+				_, _ = s.MongoConn.AbortTransaction(ctx)
 				return
 			}
 
 			if !status.CheckStatusOrder(util.Status(task.Status)) ||
-				(task.Status == string(util.StatusSuccess) || task.Status == string(util.StatusFailed)) {
+				(task.Status != string(util.StatusSuccess) || task.Status != string(util.StatusFailed)) {
 				return
 			}
 
@@ -293,22 +295,21 @@ func (s *TaskRepository) UpdateTaskStatus(id string, status util.Status, args ..
 				task.FailError = failError.Error()
 			}
 
-			if err = s.MongoConn.Update(q, task); err != nil {
+			if err = s.MongoConn.Update(ctx, q, task); err != nil {
+				_, _ = s.MongoConn.AbortTransaction(ctx)
 				errs = err
 			}
-
-			_, err = s.MongoConn.CommitTransaction(trxID, context.Background())
+			_, err = s.MongoConn.CommitTransaction(ctx)
 			if err != nil {
 				errs = err
 				return
 			}
 		}()
-
 		if errs == nil {
 			return
 		}
 
-		s.lgr.Error("failed to update task", errs, util.Object{Key: "TaskID", Val: id}, util.Object{Key: "Status", Val: status})
+		s.lgr.Error("warning to update task", errs, util.Object{Key: "TaskID", Val: id}, util.Object{Key: "Status", Val: status})
 	}()
 
 	var errs error
@@ -356,7 +357,8 @@ func (s *TaskRepository) UpdateTaskStatus(id string, status util.Status, args ..
 func (s *TaskRepository) UpdateRetryCount(id string, count int) {
 	go func() {
 		var errs error
-
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		q := bson.M{
 			"task_id": id,
 		}
@@ -379,7 +381,7 @@ func (s *TaskRepository) UpdateRetryCount(id string, count int) {
 				return
 			}
 
-			errs = s.MongoConn.UpdatePartial(q, val)
+			errs = s.MongoConn.UpdatePartial(ctx, q, val)
 			if errs == nil {
 				break
 			}
@@ -433,9 +435,11 @@ func (s *TaskRepository) ListByStatusBefore(status util.Status, t time.Time, ski
 			"$lte": t,
 		},
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	task := []*util.Task{}
-	cursor, err := s.MongoConn.List(q, skip, limit)
+	cursor, err := s.MongoConn.List(ctx, q, skip, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -457,6 +461,8 @@ func (s *TaskRepository) List(v map[string]interface{}, startTime, endTime *time
 	if s.MongoConn == nil {
 		return nil, ErrMongoNoConnection
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	q := bson.M{}
 	for key, val := range v {
@@ -471,7 +477,7 @@ func (s *TaskRepository) List(v map[string]interface{}, startTime, endTime *time
 	}
 
 	task := []*util.Task{}
-	cursor, err := s.MongoConn.List(q, skip, limit)
+	cursor, err := s.MongoConn.List(ctx, q, skip, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -514,6 +520,9 @@ func formTaskDateRangeCount(t *bsonTaskDateRangeCount) *util.TaskDateRangeCount 
 
 // ListCountDateRangeInterval  send a bucket list
 func (s *TaskRepository) ListCountDateRangeInterval(startTime, endTime time.Time, interval int) ([]util.TaskDateRangeCount, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	bsonCond := func(status string) bson.M {
 		return bson.M{
 			"$sum": bson.M{
@@ -556,7 +565,7 @@ func (s *TaskRepository) ListCountDateRangeInterval(startTime, endTime time.Time
 		},
 	}
 
-	cursor, err := s.MongoConn.Aggregate(q)
+	cursor, err := s.MongoConn.Aggregate(ctx, q)
 	if err != nil {
 		return nil, err
 	}

@@ -14,6 +14,7 @@ import (
 const (
 	database   = "cogman"
 	tableTasks = "tasks"
+	session_id = "session_id"
 )
 
 // MongoClient contaiend required field
@@ -42,21 +43,40 @@ func NewMongoClient(url string, ttl time.Duration) (*MongoClient, error) {
 	}, nil
 }
 
-func (m *MongoClient) StartTransaction(id string) (interface{}, error) {
+func (m *MongoClient) StartTransaction(ctx context.Context, id string) (context.Context, error) {
 	sess, err := m.mcl.StartSession()
 	if err != nil {
-		return nil, err
+		return ctx, err
 	}
-
+	if err := sess.StartTransaction(); err != nil {
+		return ctx, err
+	}
 	m.sess.Store(id, sess)
-	return nil, sess.StartTransaction()
+	ctx = context.WithValue(ctx,  session_id, id)
+	return ctx, nil
 }
 
-func (m *MongoClient) CommitTransaction(id string, ctx context.Context) (interface{}, error) {
+func (m *MongoClient) CommitTransaction(ctx context.Context) (interface{}, error) {
+	id := getSessionID(ctx)
 	result, ok := m.sess.Load(id)
 	if ok {
 		sess := result.(mongo.Session)
 		err := sess.CommitTransaction(ctx)
+		if err != nil {
+			return nil, err
+		}
+		sess.EndSession(ctx)
+		m.sess.Delete(id)
+	}
+	return nil, nil
+}
+
+func (m *MongoClient) AbortTransaction(ctx context.Context) (interface{}, error)  {
+	id := getSessionID(ctx)
+	result, ok := m.sess.Load(id)
+	if ok {
+		sess := result.(mongo.Session)
+		err := sess.AbortTransaction(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -76,12 +96,12 @@ func (m *MongoClient) SetTTL() (interface{}, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	col, err := m.getCollection()
+	col, err := m.getCollection(m.mcl)
 	if err != nil {
 		return nil, err
 	}
 
-	col.Indexes().DropOne(ctx, "TTL")
+	_, _ = col.Indexes().DropOne(ctx, "TTL")
 
 	opts := &options.IndexOptions{}
 	opts.SetName("TTL")
@@ -141,7 +161,7 @@ func (m *MongoClient) EnsureIndices(indices []Index) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	col, err := m.getCollection()
+	col, err := m.getCollection(m.mcl)
 	if err != nil {
 		return err
 	}
@@ -163,7 +183,7 @@ func (m *MongoClient) DropIndices() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	col, err := m.getCollection()
+	col, err := m.getCollection(m.mcl)
 	if err != nil {
 		return err
 	}
@@ -186,21 +206,43 @@ func (m *MongoClient) Connect() error {
 	return nil
 }
 
-func (m *MongoClient) getCollection() (*mongo.Collection, error) {
-	return m.mcl.Database(database).Collection(tableTasks), nil
+func (m *MongoClient) getClient(ctx context.Context) (*mongo.Client, mongo.Session, bool) {
+	tid := getSessionID(ctx)
+	val, ok := m.sess.Load(tid)
+	if !ok {
+		return m.mcl, nil, false
+	}
+	if val != nil {
+		sess := val.(mongo.Session)
+		return sess.Client(), sess, true
+	}
+	return m.mcl, nil, false
+}
+
+func (m *MongoClient) getCollection(client *mongo.Client) (*mongo.Collection, error) {
+	return client.Database(database).Collection(tableTasks), nil
 }
 
 // Get return a single object based on query parameter
-func (m *MongoClient) Get(q bson.M) (*mongo.SingleResult, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func (m *MongoClient) Get(ctx context.Context, q bson.M) (*mongo.SingleResult, error) {
+	client, sess, withSession := m.getClient(ctx)
 
-	col, err := m.getCollection()
+	col, err := m.getCollection(client)
 	if err != nil {
 		return nil, err
 	}
-
-	resp := col.FindOne(ctx, q)
+	var resp *mongo.SingleResult
+	if withSession {
+		err = mongo.WithSession(ctx, sess, func(sessionContext mongo.SessionContext) error {
+			resp = col.FindOne(sessionContext, q)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		resp = col.FindOne(ctx, q)
+	}
 	if resp.Err() != nil {
 		return nil, resp.Err()
 	}
@@ -209,30 +251,42 @@ func (m *MongoClient) Get(q bson.M) (*mongo.SingleResult, error) {
 }
 
 // Create create a object
-func (m *MongoClient) Create(t interface{}) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func (m *MongoClient) Create(ctx context.Context, t interface{}) error {
+	client, sess, withSession := m.getClient(ctx)
 
-	col, err := m.getCollection()
+	col, err := m.getCollection(client)
 	if err != nil {
 		return err
 	}
 
-	_, err = col.InsertOne(ctx, t)
+	if withSession {
+		err = mongo.WithSession(ctx, sess, func(sessionContext mongo.SessionContext) error {
+			_, err = col.InsertOne(sessionContext, t)
+			return err
+		})
+	}else {
+		_, err = col.InsertOne(ctx, t)
+	}
 	return err
 }
 
 // Update update a object
-func (m *MongoClient) Update(q, val interface{}) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	col, err := m.getCollection()
+func (m *MongoClient) Update(ctx context.Context, q, val interface{}) error {
+	client, sess, withSession := m.getClient(ctx)
+	col, err := m.getCollection(client)
 	if err != nil {
 		return err
 	}
 
-	resp, err := col.ReplaceOne(ctx, q, val)
+	var resp *mongo.UpdateResult
+	if withSession {
+		err = mongo.WithSession(ctx, sess, func(sessionContext mongo.SessionContext) error {
+			resp, err = col.ReplaceOne(sessionContext, q, val)
+			return err
+		})
+	}else {
+		resp, err = col.ReplaceOne(ctx, q, val)
+	}
 	if err != nil {
 		return err
 	}
@@ -244,16 +298,23 @@ func (m *MongoClient) Update(q, val interface{}) error {
 }
 
 // UpdatePartial update a object partially
-func (m *MongoClient) UpdatePartial(q, val interface{}) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func (m *MongoClient) UpdatePartial(ctx context.Context, q, val interface{}) error {
+	client, sess, withSession := m.getClient(ctx)
 
-	col, err := m.getCollection()
+	col, err := m.getCollection(client)
 	if err != nil {
 		return err
 	}
 
-	resp, err := col.UpdateOne(ctx, q, val)
+	var resp *mongo.UpdateResult
+	if withSession {
+		err = mongo.WithSession(ctx, sess, func(sessionContext mongo.SessionContext) error {
+			resp, err = col.UpdateOne(sessionContext, q, val)
+			return err
+		})
+	} else {
+		resp, err = col.UpdateOne(ctx, q, val)
+	}
 	if err != nil {
 		return err
 	}
@@ -265,17 +326,24 @@ func (m *MongoClient) UpdatePartial(q, val interface{}) error {
 }
 
 // List return a list of object based on query parameter
-func (m *MongoClient) List(q interface{}, skip, limit int) (*mongo.Cursor, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func (m *MongoClient) List(ctx context.Context, q interface{}, skip, limit int) (*mongo.Cursor, error) {
+	client, sess, withSession := m.getClient(ctx)
 
-	col, err := m.getCollection()
+	col, err := m.getCollection(client)
 	if err != nil {
 		return nil, err
 	}
-
 	opt := options.Find().SetSkip(int64(skip)).SetLimit(int64(limit))
-	cursor, err := col.Find(ctx, q, opt)
+
+	var cursor *mongo.Cursor
+	if withSession {
+		err = mongo.WithSession(ctx, sess, func(sessionContext mongo.SessionContext) error {
+			cursor, err = col.Find(sessionContext, q, opt)
+			return err
+		})
+	} else {
+		cursor, err = col.Find(ctx, q, opt)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -287,16 +355,23 @@ func (m *MongoClient) List(q interface{}, skip, limit int) (*mongo.Cursor, error
 }
 
 // Aggregate return a Cursor
-func (m *MongoClient) Aggregate(q interface{}) (*mongo.Cursor, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func (m *MongoClient) Aggregate(ctx context.Context, q interface{}) (*mongo.Cursor, error) {
+	client, sess, withSession := m.getClient(ctx)
 
-	col, err := m.getCollection()
+	col, err := m.getCollection(client)
 	if err != nil {
 		return nil, err
 	}
 
-	cursor, err := col.Aggregate(ctx, q)
+	var cursor *mongo.Cursor
+	if withSession {
+		err = mongo.WithSession(ctx,sess, func(sessionContext mongo.SessionContext) error {
+			cursor, err = col.Aggregate(sessionContext, q)
+			return err
+		})
+	} else {
+		cursor, err = col.Aggregate(ctx, q)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -305,4 +380,13 @@ func (m *MongoClient) Aggregate(q interface{}) (*mongo.Cursor, error) {
 	}
 
 	return cursor, nil
+}
+
+
+func getSessionID(ctx context.Context) string {
+	val := ctx.Value(session_id)
+	if val == nil {
+		return ""
+	}
+	return val.(string)
 }
