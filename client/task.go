@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"time"
 
 	"github.com/Tapfury/cogman/util"
@@ -103,7 +104,7 @@ func (s *Session) SendTask(t util.Task) error {
 			return
 		}
 
-		s.taskRepo.UpdateTaskStatus(t.TaskID, util.StatusQueued)
+		s.taskRepo.UpdateTaskStatus(context.Background(), t.TaskID, util.StatusQueued)
 	}()
 
 	done := (<-chan time.Time)(make(chan time.Time, 1))
@@ -138,7 +139,7 @@ func (s *Session) SendTask(t util.Task) error {
 			go s.RetryTask(t)
 		}
 
-		s.taskRepo.UpdateTaskStatus(t.TaskID, util.StatusFailed, errs)
+		s.taskRepo.UpdateTaskStatus(context.Background(), t.TaskID, util.StatusFailed, errs)
 	}
 
 	return errs
