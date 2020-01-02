@@ -3,7 +3,6 @@ package repo
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/Tapfury/cogman/infra"
@@ -263,7 +262,6 @@ func (s *TaskRepository) UpdateTaskStatus(ctx context.Context, id string, status
 		errs = nil
 		func() {
 			var err error
-			fmt.Println(id, "><")
 			trxID := util.GenerateRandStr(10)
 			ctx, err = s.MongoConn.StartTransaction(ctx, trxID)
 			if err != nil {
@@ -295,7 +293,6 @@ func (s *TaskRepository) UpdateTaskStatus(ctx context.Context, id string, status
 			task.FailError = ""
 			if failError != nil {
 				task.FailError = failError.Error()
-				fmt.Println(task.FailError, "5")
 			}
 
 			if err = s.MongoConn.Update(ctx, q, task); err != nil {
@@ -440,7 +437,6 @@ func (s *TaskRepository) ListByStatusBefore(status util.Status, t time.Time, ski
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
 
 	task := []*util.Task{}
 	cursor, err := s.MongoConn.List(ctx, q, skip, limit)
