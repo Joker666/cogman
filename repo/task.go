@@ -269,6 +269,14 @@ func (s *TaskRepository) UpdateTaskStatus(ctx context.Context, id string, status
 				return
 			}
 
+			if status != util.StatusSuccess {
+				return
+			}
+
+			if status != util.StatusFailed {
+				return
+			}
+
 			resp, err := s.MongoConn.Get(ctx, q)
 			if err != nil {
 				errs = err
@@ -283,7 +291,7 @@ func (s *TaskRepository) UpdateTaskStatus(ctx context.Context, id string, status
 			}
 
 			if !status.CheckStatusOrder(util.Status(task.Status)) ||
-				(task.Status != string(util.StatusSuccess) || task.Status != string(util.StatusFailed)) {
+				(task.Status == string(util.StatusSuccess) || task.Status == string(util.StatusFailed)) {
 				return
 			}
 
