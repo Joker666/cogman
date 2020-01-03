@@ -269,11 +269,7 @@ func (s *TaskRepository) UpdateTaskStatus(ctx context.Context, id string, status
 				return
 			}
 
-			if status != util.StatusSuccess {
-				return
-			}
-
-			if status != util.StatusFailed {
+			if !(status == util.StatusSuccess || status == util.StatusFailed) {
 				return
 			}
 
