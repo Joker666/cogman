@@ -1,4 +1,4 @@
-[![Go Report Card](https://goreportcard.com/badge/Joker666/cogman)](https://goreportcard.com/report/github.com/Joker666/cogman) [![License](https://img.shields.io/badge/license-SATA-blue)](https://github.com/Joker666/cogman/blob/master/LICENSE)
+[![CircleCI](https://circleci.com/gh/Joker666/cogman.svg?style=svg)](https://circleci.com/gh/Joker666/cogman) [![Go Report Card](https://goreportcard.com/badge/Joker666/cogman)](https://goreportcard.com/report/github.com/Joker666/cogman) [![License](https://img.shields.io/badge/license-SATA-blue)](https://github.com/Joker666/cogman/blob/master/LICENSE)
 
 <h1 align="center"> Cogman </h1>
 
