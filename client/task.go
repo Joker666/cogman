@@ -158,7 +158,7 @@ func (s *Session) RetryTask(t util.Task) error {
 	// updating original task id counter
 	s.taskRepo.UpdateRetryCount(t.OriginalTaskID, -1)
 	if err := s.SendTask(task); err != nil {
-		s.lgr.Error("failed to retry", err, util.Object{Key: "TaskID", Val: task.TaskID}, util.Object{"OriginalTaskID", task.OriginalTaskID})
+		s.lgr.Error("failed to retry", err, util.Object{Key: "TaskID", Val: task.TaskID}, util.Object{Key: "OriginalTaskID", Val: task.OriginalTaskID})
 		return err
 	}
 

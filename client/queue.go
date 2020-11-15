@@ -63,6 +63,7 @@ func (s *Session) GetQueueName(pType util.TaskPriority) (string, error) {
 	return name, nil
 }
 
+// EnsureQueue ensures that all required queues are available
 func (s *Session) EnsureQueue(con *amqp.Connection, queue string, taskType util.TaskPriority) (*amqp.Queue, error) {
 	channel, err := con.Channel()
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"os"
 )
 
+// LogLevel holds log level values
 type LogLevel uint8
 
 func (l LogLevel) String() string {
@@ -23,6 +24,7 @@ func (l LogLevel) String() string {
 	return ""
 }
 
+// LogLevel is levels of logs
 const (
 	LogLevelError LogLevel = iota
 	LogLevelWarn
@@ -31,6 +33,7 @@ const (
 	LogLevelTrace
 )
 
+// Logger is the logs interface
 type Logger interface {
 	Error(msg string, err error, objects ...Object)
 	Debug(msg string, objects ...Object)
@@ -42,18 +45,22 @@ type noOpLogger struct{}
 
 func (noOpLogger) Log(LogLevel, ...interface{}) {}
 
+// NoOpLogger is no operation logger
 var NoOpLogger = noOpLogger{}
 
+// StdLogger holds a log
 type StdLogger struct {
 	lgr *log.Logger
 }
 
+// NewLogger returns a new standard logger
 func NewLogger() StdLogger {
 	return StdLogger{
 		lgr: log.New(os.Stdout, "", log.LstdFlags),
 	}
 }
 
+// Object is a basic key value object
 type Object struct {
 	Key string
 	Val interface{}
@@ -78,18 +85,22 @@ func (l StdLogger) log(level LogLevel, v ...interface{}) {
 	l.lgr.Println(append([]interface{}{level}, v...)...)
 }
 
-func (s StdLogger) Error(msg string, err error, objects ...Object) {
-	s.log(LogLevelError, prepareEntry(msg, err, objects...))
+// Error prints error logs
+func (l StdLogger) Error(msg string, err error, objects ...Object) {
+	l.log(LogLevelError, prepareEntry(msg, err, objects...))
 }
 
-func (s StdLogger) Warn(msg string, objects ...Object) {
-	s.log(LogLevelWarn, prepareEntry(msg, nil, objects...))
+// Warn prints warning logs
+func (l StdLogger) Warn(msg string, objects ...Object) {
+	l.log(LogLevelWarn, prepareEntry(msg, nil, objects...))
 }
 
-func (s StdLogger) Info(msg string, objects ...Object) {
-	s.log(LogLevelInfo, prepareEntry(msg, nil, objects...))
+// Info prints info logs
+func (l StdLogger) Info(msg string, objects ...Object) {
+	l.log(LogLevelInfo, prepareEntry(msg, nil, objects...))
 }
 
-func (s StdLogger) Debug(msg string, objects ...Object) {
-	s.log(LogLevelDebug, prepareEntry(msg, nil, objects...))
+// Debug prints debug logs
+func (l StdLogger) Debug(msg string, objects ...Object) {
+	l.log(LogLevelDebug, prepareEntry(msg, nil, objects...))
 }

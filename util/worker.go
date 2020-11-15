@@ -14,6 +14,7 @@ type Handler interface {
 // HandlerFunc is a task handler function type
 type HandlerFunc func(ctx context.Context, payload []byte) error
 
+// Do actually does the work
 func (h HandlerFunc) Do(ctx context.Context, payload []byte) error {
 	return h(ctx, payload)
 }

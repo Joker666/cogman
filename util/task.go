@@ -2,6 +2,7 @@ package util
 
 import "time"
 
+// Status is the status of the task
 type Status string
 
 // list of task status
@@ -14,6 +15,7 @@ const (
 	StatusSuccess    Status = "success"
 )
 
+// TaskPriority is the priority of the task
 type TaskPriority string
 
 // list of TaskPriority
@@ -57,6 +59,7 @@ func (p Status) CheckStatusOrder(st Status) bool {
 	return val[p] > val[st]
 }
 
+// TaskDateRangeCount holds necessary values for task and it's statuses in a date range
 type TaskDateRangeCount struct {
 	ID              time.Time
 	Total           int

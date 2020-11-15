@@ -12,6 +12,7 @@ const alpha = `abcdefghijklmnopqrstuvwxyz` +
 const num = `0123456789`
 const charset = alpha + num
 
+// GenerateRandStr generates random string
 func GenerateRandStr(l int) string {
 	r := rand.New(randSrc)
 	b := make([]byte, l)

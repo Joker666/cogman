@@ -74,7 +74,7 @@ func (m *MongoClient) CommitTransaction(ctx context.Context) (interface{}, error
 }
 
 // AbortTransaction aborts a transaction
-func (m *MongoClient) AbortTransaction(ctx context.Context) (interface{}, error)  {
+func (m *MongoClient) AbortTransaction(ctx context.Context) (interface{}, error) {
 	id := getSessionID(ctx)
 	result, ok := m.sess.Load(id)
 	if ok {
@@ -267,7 +267,7 @@ func (m *MongoClient) Create(ctx context.Context, t interface{}) error {
 			_, err = col.InsertOne(sessionContext, t)
 			return err
 		})
-	}else {
+	} else {
 		_, err = col.InsertOne(ctx, t)
 	}
 	return err
@@ -287,7 +287,7 @@ func (m *MongoClient) Update(ctx context.Context, q, val interface{}) error {
 			resp, err = col.ReplaceOne(sessionContext, q, val)
 			return err
 		})
-	}else {
+	} else {
 		resp, err = col.ReplaceOne(ctx, q, val)
 	}
 	if err != nil {
@@ -357,7 +357,7 @@ func (m *MongoClient) List(ctx context.Context, q interface{}, skip, limit int) 
 	return cursor, nil
 }
 
-// Aggregate return a Cursor
+// Aggregate handles aggregation and return a Cursor
 func (m *MongoClient) Aggregate(ctx context.Context, q interface{}) (*mongo.Cursor, error) {
 	client, sess, withSession := m.getClient(ctx)
 
@@ -368,7 +368,7 @@ func (m *MongoClient) Aggregate(ctx context.Context, q interface{}) (*mongo.Curs
 
 	var cursor *mongo.Cursor
 	if withSession {
-		err = mongo.WithSession(ctx,sess, func(sessionContext mongo.SessionContext) error {
+		err = mongo.WithSession(ctx, sess, func(sessionContext mongo.SessionContext) error {
 			cursor, err = col.Aggregate(sessionContext, q)
 			return err
 		})

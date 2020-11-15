@@ -14,6 +14,7 @@ var (
 	clientSession *client.Session
 )
 
+// StartBackground starts the server and client in background
 func StartBackground(cfg *config.Config) error {
 	serverCfg, clientCfg, err := setConfig(cfg)
 	if err != nil {
@@ -44,9 +45,10 @@ func StartBackground(cfg *config.Config) error {
 	return nil
 }
 
-func SendTask(task util.Task, hdlr util.Handler) error {
-	if hdlr != nil {
-		if err := Register(task.Name, hdlr); err != nil {
+// SendTask sends task to server from client
+func SendTask(task util.Task, handler util.Handler) error {
+	if handler != nil {
+		if err := Register(task.Name, handler); err != nil {
 			return err
 		}
 	}
@@ -54,6 +56,7 @@ func SendTask(task util.Task, hdlr util.Handler) error {
 	return clientSession.SendTask(task)
 }
 
+// Register registers task for server to process
 func Register(taskName string, handler util.Handler) error {
 	if handler == nil || taskName == "" {
 		return ErrInvalidData

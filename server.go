@@ -250,13 +250,13 @@ func (s *Server) bootstrap() error {
 	}
 
 	// Redis connection
-	rcon := infra.NewRedisClient(s.cfg.Redis.URI, s.cfg.Redis.TTL)
+	rConn := infra.NewRedisClient(s.cfg.Redis.URI, s.cfg.Redis.TTL)
 	s.lgr.Debug("pinging redis", util.Object{Key: "uri", Val: s.cfg.Redis.URI})
-	if err := rcon.Ping(); err != nil {
+	if err := rConn.Ping(); err != nil {
 		s.lgr.Error("failed redis ping", err)
 	}
 
-	s.taskRepo = repo.NewTaskRepo(rcon, mcl)
+	s.taskRepo = repo.NewTaskRepo(rConn, mcl)
 	if s.cfg.Mongo.URI != "" {
 		// Setting task repository
 		if err := s.taskRepo.EnsureIndices(); err != nil {
