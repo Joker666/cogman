@@ -15,6 +15,7 @@ var (
 	TaskErrorGenerator = "error_generator"
 )
 
+// TaskList returns list of task names
 func TaskList() []string {
 	return []string{
 		TaskAddition,
@@ -24,11 +25,13 @@ func TaskList() []string {
 	}
 }
 
+// TaskBody holds fields for task body
 type TaskBody struct {
 	Num1 int
 	Num2 int
 }
 
+// GetAdditionTask returns addition task
 func GetAdditionTask(numA, numB int, p util.TaskPriority, retryCount int) (*util.Task, error) {
 	body := TaskBody{
 		Num1: numA,
@@ -51,6 +54,7 @@ func GetAdditionTask(numA, numB int, p util.TaskPriority, retryCount int) (*util
 	return task, nil
 }
 
+// GetMultiplicationTask returns multiplication task
 func GetMultiplicationTask(numA, numB int, p util.TaskPriority, retryCount int) (*util.Task, error) {
 	body := TaskBody{
 		Num1: numA,
@@ -73,6 +77,7 @@ func GetMultiplicationTask(numA, numB int, p util.TaskPriority, retryCount int) 
 	return task, nil
 }
 
+// GetSubtractionTask returns subtraction task
 func GetSubtractionTask(numA, numB int, p util.TaskPriority, retryCount int) (*util.Task, error) {
 	body := TaskBody{
 		Num1: numA,

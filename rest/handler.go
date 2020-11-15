@@ -15,12 +15,12 @@ import (
 	"github.com/streadway/amqp"
 )
 
-// RestConfig hold the required fields
-type RestConfig struct {
+// Config hold the required fields
+type Config struct {
 	Port string
 
 	AmqpCon *amqp.Connection
-	Clnt    *client.Session
+	Client  *client.Session
 
 	TaskRep   *repo.TaskRepository
 	QueueName []string
@@ -32,7 +32,7 @@ type cogmanHandler struct {
 	mux *http.ServeMux
 
 	amqp      *amqp.Connection
-	clnt      *client.Session
+	client    *client.Session
 	taskRepo  *cogman.TaskRepository
 	queueName []string
 
@@ -46,12 +46,12 @@ func (s *cogmanHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // NewCogmanHandler return a cogmanHandler instance
-func NewCogmanHandler(cfg *RestConfig) *cogmanHandler {
+func NewCogmanHandler(cfg *Config) *cogmanHandler {
 	return &cogmanHandler{
 		mux: http.NewServeMux(),
 
 		amqp:      cfg.AmqpCon,
-		clnt:      cfg.Clnt,
+		client:    cfg.Client,
 		taskRepo:  cfg.TaskRep,
 		queueName: cfg.QueueName,
 
@@ -123,8 +123,8 @@ func (s *cogmanHandler) listTask(w http.ResponseWriter, r *http.Request) {
 	resp.ServeData(w, r, http.StatusOK, taskList, nil)
 }
 
-// getDaterangecount response with a bucket list of time range
-func (s *cogmanHandler) getDaterangecount(w http.ResponseWriter, r *http.Request) {
+// getDateRangeCount response with a bucket list of time range
+func (s *cogmanHandler) getDateRangeCount(w http.ResponseWriter, r *http.Request) {
 	setupResponse(&w, r)
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
@@ -198,6 +198,7 @@ func (s *cogmanHandler) info(w http.ResponseWriter, r *http.Request) {
 	resp.ServeData(w, r, http.StatusOK, amqpInfo{len(data), totalTask, data}, nil)
 }
 
+// TaskRetry holds necessary values to retry a task
 type TaskRetry struct {
 	TaskID string `json:"task_id"`
 	Retry  int    `json:"retry"`
@@ -237,7 +238,7 @@ func (s *cogmanHandler) retry(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.taskRepo.UpdateRetryCount(task.OriginalTaskID, rTask.Retry)
-	if err := s.clnt.RetryTask(*task); err != nil {
+	if err := s.client.RetryTask(*task); err != nil {
 		resp.ServeError(w, r, err)
 		return
 	}

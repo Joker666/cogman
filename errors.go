@@ -2,6 +2,7 @@ package cogman
 
 import "errors"
 
+// list of errors
 var (
 	ErrRequestTimeout    = errors.New("cogman: request timeout")
 	ErrInvalidData       = errors.New("cogman: invalid data")
@@ -17,6 +18,7 @@ var (
 	ErrNoTaskID          = errors.New("cogman: no task id")
 )
 
+// TaskHandlerMissingError is error when task handler is missing
 type TaskHandlerMissingError string
 
 func (t TaskHandlerMissingError) Error() string {

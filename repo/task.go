@@ -176,13 +176,13 @@ func (s *TaskRepository) CreateTask(task *util.Task) error {
 			return
 		}
 
-		byts, err := json.Marshal(task)
+		bytes, err := json.Marshal(task)
 		if err != nil {
 			errs = err
 			return
 		}
 
-		err = s.RedisConn.Create(task.TaskID, byts)
+		err = s.RedisConn.Create(task.TaskID, bytes)
 		if err != nil {
 			errs = err
 			return
@@ -244,7 +244,7 @@ func (s *TaskRepository) UpdateTaskStatus(ctx context.Context, id string, status
 	case util.StatusSuccess:
 		dur, ok := args[0].(float64)
 		if !ok {
-			s.lgr.Error("UpdateTaskStatus", ErrDurationRequired)
+			s.lgr.Error("bytes", ErrDurationRequired)
 			return
 		}
 		duration = &dur
@@ -342,14 +342,13 @@ func (s *TaskRepository) UpdateTaskStatus(ctx context.Context, id string, status
 			task.FailError = failError.Error()
 		}
 
-		byts, err := json.Marshal(task)
+		bytes, err := json.Marshal(task)
 		if err != nil {
 			errs = err
 			return
 		}
 
-		errs = s.RedisConn.Update(task.TaskID, byts)
-
+		errs = s.RedisConn.Update(task.TaskID, bytes)
 	}()
 
 	if errs != nil {
@@ -413,13 +412,13 @@ func (s *TaskRepository) UpdateRetryCount(id string, count int) {
 		task.UpdatedAt = time.Now()
 		task.Retry += count
 
-		byts, err := json.Marshal(task)
+		bytes, err := json.Marshal(task)
 		if err != nil {
 			errs = err
 			return
 		}
 
-		errs = s.RedisConn.Update(task.TaskID, byts)
+		errs = s.RedisConn.Update(task.TaskID, bytes)
 	}()
 
 	if errs != nil {

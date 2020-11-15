@@ -1,4 +1,6 @@
-<h1 align="center">  Cogman </h1>
+[![Go Report Card](https://goreportcard.com/badge/Joker666/cogman)](https://goreportcard.com/report/github.com/Joker666/cogman) [![License](https://img.shields.io/badge/license-SATA-blue)](https://github.com/Joker666/cogman/blob/master/LICENSE)
+
+<h1 align="center"> Cogman </h1>
 
 A distributed task runner.
 
@@ -6,7 +8,7 @@ A distributed task runner.
 
 ### Clone & Build: 
 ```
-go get github.com/Tapfury/cogman
+go get github.com/Joker666/cogman
 cd cogman
 ./build.sh
 ```
@@ -59,7 +61,7 @@ Client & Server have individual config file to use them separately.
 
 #### Client/Server
 
-This Congman api call will start a client and a server.
+This Cogman api call will start a client and a server.
 
 ```go
 if err := cogman.StartBackground(cfg); err != nil {
@@ -71,24 +73,24 @@ Initiate Client & Server individually:
 
 ```go
 // Client
-clnt, err := cogman.NewSession(cfg)
+client, err := cogman.NewSession(cfg)
 if err != nil {
     log.Fatal(err)
 }
 
-if err := clnt.Connect(); err != nil {
+if err := client.Connect(); err != nil {
     log.Fatal(err)
 }
 
 // Server
-srvr, err := cogman.NewServer(cfg)
+server, err := cogman.NewServer(cfg)
 if err != nil {
     log.Fatal(err)
 }
 
 go func() {
-    defer srvr.Stop()
-    if err = srvr.Start(); err != nil {
+    defer server.Stop()
+    if err = server.Start(); err != nil {
         log.Fatal(err)
     }
 }()
@@ -105,7 +107,7 @@ type Task struct {
     OriginalTaskID string       // a retry task will carry it's parents ID.
     PrimaryKey     string       // optional. Client can set any key to trace a task.
     Retry          int          // default value 0.
-    Prefetch      int          // optional. Number of task fetch from queue by consumer at a time.
+    Prefetch       int          // optional. Number of task fetch from queue by consumer at a time.
     Payload        []byte       // required
     Priority       TaskPriority // required. High or Low
     Status         Status       // current task status
@@ -118,7 +120,7 @@ type Task struct {
 
 #### Worker/Task Handler
 
-Any struct can be passed as a handler it implement below `interface`:
+Any struct can be passed as a handler it implements below `interface`:
 
 ```go
 type Handler interface {
@@ -173,22 +175,30 @@ Cogman queue type:
 - Low_Priority_Queue  [lazy Queue]
 ```
 
-Two type queue Cogman maintain. Default & Lazy queue. All the high priority task will be push to default queue and low priority task will be push to lazy queue. The number of each type of queue can be set by client/server. And queue won't be lost after any sort of connection interruption.
+There are two types queues that Cogman maintains. Default & Lazy queue.
+High priority tasks would be pushed to default queue and low priority task would be pushed to lazy queue.
+The number of each type of queues can be set by client/server through configuration.
+Queue won't be lost after any sort of connection interruption.
 
 #### Re-Connection
 
-Cogman Client & Server both handler reconnection. If Client loss connection, it can still take task and those will be processed immediate after Cogman client get back the connection.
-After Server reconnect, it will start to consume task without losing any task.
+Cogman Client & Server both handles reconnection. If the client loses connection, it can still take tasks,
+and those will be processed immediate after Cogman client gets back the connection.
+After Server reconnects, it will start to consume tasks without losing any task.
 
 #### Re-Enqueue
 
-Re-enqueue feature to recover all the initiated task those are lost for connection error. If client somehow lost the amqp connection, Cogman can still take the task in offline. All offline task will be re-queue after connection re-established. Cogman fetch all the offline task from mongo logs, and re-initiate them. Mongo connection required here. For re-enqueuing, task retry count wont be changed.
+Re-enqueue feature to recover all the initiated task those are lost for connection error.
+If client somehow loses the amqp connection, Cogman can still take the task in offline.
+All offline task will be re-queue after connection re-established.
+Cogman fetches all the offline tasks from mongo logs, and re-initiate them. Mongo connection required here.
+For re-enqueuing, task retry count would not change.
 
 #### Implementation
-- [Simple use](https://github.com/Tapfury/cogman/tree/master/example/simple)
-- [Queue type](https://github.com/Tapfury/cogman/tree/master/example/queue)
-- [Client & Server](https://github.com/Tapfury/cogman/tree/master/example/client-server)
-- [Task & Task Handler](https://github.com/Tapfury/cogman/tree/master/example/tasks)
+- [Simple use](https://github.com/Joker666/cogman/tree/master/example/simple)
+- [Queue type](https://github.com/Joker666/cogman/tree/master/example/queue)
+- [Client & Server](https://github.com/Joker666/cogman/tree/master/example/client-server)
+- [Task & Task Handler](https://github.com/Joker666/cogman/tree/master/example/tasks)
 
 
 ### Feature Comparison

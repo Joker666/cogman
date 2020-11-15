@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// Response returns response body
 type Response interface {
 	Header() http.Header
 	Body() []byte
@@ -48,6 +49,7 @@ type JSONResponse struct {
 	Meta   *Pager      `json:"meta,omitempty"`
 }
 
+// Header returns header
 func (r *JSONResponse) Header() http.Header {
 	if r.header == nil {
 		r.header = http.Header{}
@@ -56,6 +58,7 @@ func (r *JSONResponse) Header() http.Header {
 	return r.header
 }
 
+// Body returns payload
 func (r *JSONResponse) Body() []byte {
 	body, err := json.Marshal(r)
 	if err != nil {

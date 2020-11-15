@@ -50,6 +50,7 @@ func main() {
 	<-end
 }
 
+// SendExampleTask sends example task
 func SendExampleTask(client *cogman.Session) error {
 	log.Printf("========================================>")
 

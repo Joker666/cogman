@@ -6,6 +6,7 @@ import (
 	"github.com/Joker666/cogman/util"
 )
 
+// CogmanError holds error
 type CogmanError error
 
 // Error represents a response object of api error
@@ -30,6 +31,7 @@ func ServeBadRequest(w http.ResponseWriter, r *http.Request, err error) {
 	Render(w, r, re)
 }
 
+// ServeInvalidMethod returns http invalid error
 func ServeInvalidMethod(w http.ResponseWriter, r *http.Request, err error) {
 	re := &JSONResponse{
 		response: response{code: http.StatusMethodNotAllowed},

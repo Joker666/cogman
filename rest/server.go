@@ -8,7 +8,7 @@ import (
 )
 
 // StartRestServer initiates a rest server
-func StartRestServer(ctx context.Context, cfg *RestConfig) {
+func StartRestServer(ctx context.Context, cfg *Config) {
 	if cfg.Port == "" {
 		cfg.Port = ":8081"
 	}
@@ -39,7 +39,7 @@ func StartRestServer(ctx context.Context, cfg *RestConfig) {
 }
 
 // list of route
-func getHandler(cfg *RestConfig) http.Handler {
+func getHandler(cfg *Config) http.Handler {
 	handler := NewCogmanHandler(cfg)
 
 	handler.mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +48,7 @@ func getHandler(cfg *RestConfig) http.Handler {
 
 	handler.mux.HandleFunc("/get", handler.get)
 	handler.mux.HandleFunc("/list", handler.listTask)
-	handler.mux.HandleFunc("/daterangecount", handler.getDaterangecount)
+	handler.mux.HandleFunc("/daterangecount", handler.getDateRangeCount)
 	handler.mux.HandleFunc("/info", handler.info)
 	handler.mux.HandleFunc("/retry", handler.retry)
 

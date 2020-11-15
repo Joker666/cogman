@@ -167,9 +167,9 @@ func (s *Server) Start() error {
 
 	ctx, stop := context.WithCancel(context.Background())
 
-	restCfg := &rest.RestConfig{
+	restCfg := &rest.Config{
 		AmqpCon:   s.acon,
-		Clnt:      s.retryConn,
+		Client:    s.retryConn,
 		TaskRep:   s.taskRepo,
 		Lgr:       s.lgr,
 		QueueName: queueName,

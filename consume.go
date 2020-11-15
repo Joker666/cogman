@@ -121,7 +121,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 			continue
 		}
 
-		wrkr, ok := s.workers[taskName]
+		worker, ok := s.workers[taskName]
 		if !ok {
 			errCh <- errorTaskBody{
 				taskID,
@@ -133,12 +133,12 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 
 		wg.Add(1)
 		// Start processing task
-		go func(wrkr *util.Worker, msg *amqp.Delivery) {
+		go func(worker *util.Worker, msg *amqp.Delivery) {
 			defer wg.Done()
 
-			s.lgr.Info("processing task", util.Object{Key: "taskName", Val: wrkr.Name()}, util.Object{Key: "taskID", Val: taskID})
+			s.lgr.Info("processing task", util.Object{Key: "taskName", Val: worker.Name()}, util.Object{Key: "taskID", Val: taskID})
 			startAt := time.Now()
-			if err := wrkr.Process(msg); err != nil {
+			if err := worker.Process(msg); err != nil {
 				errCh <- errorTaskBody{
 					taskID,
 					util.StatusFailed,
@@ -150,7 +150,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 
 			s.taskRepo.UpdateTaskStatus(ctx, taskID, util.StatusSuccess, duration)
 
-		}(wrkr, &msg)
+		}(worker, &msg)
 	}
 
 	wg.Wait()
@@ -160,22 +160,22 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 
 // setConsumer set a consumer for each single queue.
 func (s *Server) setConsumer(ctx context.Context, queue, mode string, prefetch int, taskPool chan<- amqp.Delivery) {
-	chnl, err := s.acon.Channel()
+	channel, err := s.acon.Channel()
 	if err != nil {
 		s.lgr.Error("failed to create channel", err)
 		return
 	}
 
-	defer chnl.Close()
+	defer channel.Close()
 
-	closeNotification := chnl.NotifyClose(make(chan *amqp.Error, 1))
+	closeNotification := channel.NotifyClose(make(chan *amqp.Error, 1))
 
-	if err := chnl.Qos(prefetch, 0, false); err != nil {
+	if err := channel.Qos(prefetch, 0, false); err != nil {
 		s.lgr.Error("failed to set qos", err)
 		return
 	}
 
-	msg, err := chnl.Consume(
+	msg, err := channel.Consume(
 		queue,
 		"",
 		false,

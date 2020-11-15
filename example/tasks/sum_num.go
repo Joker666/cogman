@@ -9,16 +9,19 @@ import (
 	"github.com/Joker666/cogman/util"
 )
 
+// SumTask holds necessary fields for multiply task
 type SumTask struct {
 	Name string
 }
 
+// NewSumTask returns instance of SumTask
 func NewSumTask() util.Handler {
 	return SumTask{
 		Name: TaskAddition,
 	}
 }
 
+// Do handles task
 func (t SumTask) Do(ctx context.Context, payload []byte) error {
 	var body TaskBody
 	if err := json.Unmarshal(payload, &body); err != nil {
