@@ -28,7 +28,8 @@ type Config struct {
 	Lgr util.Logger
 }
 
-type cogmanHandler struct {
+// CogmanHandler holds necessary fields for handling
+type CogmanHandler struct {
 	mux *http.ServeMux
 
 	amqp      *amqp.Connection
@@ -39,15 +40,15 @@ type cogmanHandler struct {
 	log util.Logger
 }
 
-func (s *cogmanHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *CogmanHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// TODO: auth middleware
 
 	s.mux.ServeHTTP(w, r)
 }
 
 // NewCogmanHandler return a cogmanHandler instance
-func NewCogmanHandler(cfg *Config) *cogmanHandler {
-	return &cogmanHandler{
+func NewCogmanHandler(cfg *Config) *CogmanHandler {
+	return &CogmanHandler{
 		mux: http.NewServeMux(),
 
 		amqp:      cfg.AmqpCon,
@@ -66,7 +67,7 @@ func setupResponse(w *http.ResponseWriter, req *http.Request) {
 }
 
 // get response with a task object
-func (s *cogmanHandler) get(w http.ResponseWriter, r *http.Request) {
+func (s *CogmanHandler) get(w http.ResponseWriter, r *http.Request) {
 	setupResponse(&w, r)
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
@@ -94,7 +95,7 @@ func (s *cogmanHandler) get(w http.ResponseWriter, r *http.Request) {
 }
 
 // listTask response with a list of task object
-func (s *cogmanHandler) listTask(w http.ResponseWriter, r *http.Request) {
+func (s *CogmanHandler) listTask(w http.ResponseWriter, r *http.Request) {
 	setupResponse(&w, r)
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
@@ -124,7 +125,7 @@ func (s *cogmanHandler) listTask(w http.ResponseWriter, r *http.Request) {
 }
 
 // getDateRangeCount response with a bucket list of time range
-func (s *cogmanHandler) getDateRangeCount(w http.ResponseWriter, r *http.Request) {
+func (s *CogmanHandler) getDateRangeCount(w http.ResponseWriter, r *http.Request) {
 	setupResponse(&w, r)
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
@@ -167,7 +168,7 @@ type amqpInfo struct {
 }
 
 // info response the queue list and their info
-func (s *cogmanHandler) info(w http.ResponseWriter, r *http.Request) {
+func (s *CogmanHandler) info(w http.ResponseWriter, r *http.Request) {
 	setupResponse(&w, r)
 	if r.Method != http.MethodGet {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
@@ -205,7 +206,7 @@ type TaskRetry struct {
 }
 
 // retry will re initiate a fail job
-func (s *cogmanHandler) retry(w http.ResponseWriter, r *http.Request) {
+func (s *CogmanHandler) retry(w http.ResponseWriter, r *http.Request) {
 	setupResponse(&w, r)
 	if r.Method != http.MethodPost {
 		resp.ServeInvalidMethod(w, r, ErrInvalidMethod)
