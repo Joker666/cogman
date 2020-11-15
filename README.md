@@ -1,5 +1,5 @@
 [![CircleCI](https://circleci.com/gh/Joker666/cogman.svg?style=svg)](https://circleci.com/gh/Joker666/cogman) [![Go Report Card](https://goreportcard.com/badge/Joker666/cogman)](https://goreportcard.com/report/github.com/Joker666/cogman) [![GitHub](https://img.shields.io/github/license/Joker666/cogman)](https://github.com/Joker666/cogman/blob/master/LICENSE)
-![logo](https://i.imgur.com/by0sIiG.png)
+![logo](https://i.imgur.com/by0sIiG.png) [![godoc for Joker666/cogman](https://godoc.org/github.com/nathany/looper?status.svg)](http://godoc.org/github.com/Joker666/cogman)
 
 <h1 align="center"> Cogman </h1>
 
