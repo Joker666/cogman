@@ -1,7 +1,7 @@
 ### Simple example
 ---
 
-Congman provide individual api and config method to make it easier to use. Just calling the api will launch client and server together. Here registering task handler & sending task can be done on fly.  
+Cogman provides api and config method to make it easier to use. Just calling the api will launch client and server together. Here registering task handler & sending task can be done on fly.  
 
 * [Config setup](#config)
 * [Start Background API](#start-background)
@@ -10,7 +10,9 @@ Congman provide individual api and config method to make it easier to use. Just 
 
 #### Config:
 
-Cogman provide most simplest approach to setup config file. It only ask for `amqp` & `redis` connection address. Other field will be fill up by default value if they are empty.
+Cogman provide the simplest approach to set up config file.
+It only asks for `amqp` & `redis` connection address.
+Other fields would be filled up by default value if they are kept empty.
 
 ```go
 cfg := &config.Config{
@@ -20,7 +22,7 @@ cfg := &config.Config{
 ```
 
 #### Start Background
-this simple api call will start a client and a server. 
+This simple api call will start a client and a server. 
 
 ```go
 if err := cogman.StartBackground(cfg); err != nil {
@@ -29,7 +31,10 @@ if err := cogman.StartBackground(cfg); err != nil {
 ```
 
 #### Send Task
-Send task will deliver the task to `amqp`. Task also need a handler to execute that task. Handler can be register individually using [Register](#register) api. Then handler parameter in `SendTask` should be `nil`.
+SendTask will deliver the task to `amqp`.
+Task also need a handler to execute that task.
+Handler can be register individually using [Register](#register) api.
+Then handler parameter in `SendTask` should be `nil`.
 
 ```go
 if err := cogman.SendTask(task, handler); err != nil {
@@ -41,7 +46,7 @@ if err := cogman.SendTask(task, handler); err != nil {
 For registering a task handler at any point of the program, register api can be used. `handler` is an interface that only required a `Do` method to implement.
 
 ```go
-cogman.Register(exampletasks.TaskAddition, handler)
+cogman.Register(exampleTasks.TaskAddition, handler)
 if err != nil {
     log.Fatal(err)
 }

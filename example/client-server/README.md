@@ -2,9 +2,12 @@
 Client and server can be initiated individually in Cogman.
 
 #### Client Example
-Create a new session for making a new client connection. After that initiate the queues. `client.connect` also initiates a re-enqueue process if it gets it from config.
+Create a new session for making a new client connection.
+This also initiates the queues.
+`client.connect` also initiates a re-enqueue process if it gets it from the config.
 
-Cogman store task log if somehow `rabbitamq` loss the connection so that they can be re-processed. The moment client re-start, it fetch all the task from `mongo` with status `initiated` and process them again.
+Cogman stores task logs if somehow `amqp` loses the connection so that they can be re-processed.
+When the client re-starts, it fetches all the tasks from `mongodb` with status `initiated` and processes them again.
 
 ##### config 
 ```go
@@ -24,22 +27,22 @@ cfg := config.Client{
     ReEnqueue: true, // default value false. Mongo connection required if ReEnqueue: true
 }
 ```
-Cogman client follow round robin process to decide in which queue task will be pushed. 
+Cogman client follows round robin approach to decide in which queue tasks will be pushed within the priority. 
 
 ```go
-clnt, err := cogman.NewSession(cfg)
+client, err := cogman.NewSession(cfg)
 if err != nil {
     log.Fatal(err)
 }
 
-if err := clnt.Connect(); err != nil {
+if err := client.Connect(); err != nil {
     log.Fatal(err)
 }
 ```
 
-Cogman client has individual API for sending task. Each task must a registered task handler. 
+Cogman client has a simple API for sending tasks to server. Each task must have a registered task handler. 
 ```go
-if err := clnt.SendTask(task); err != nil {
+if err := client.SendTask(task); err != nil {
     return err
 }
 ```
@@ -61,7 +64,7 @@ cfg := config.Server{
 }
 ```
 
-Cogman server can pull task from any number of queue and process then asynchronously.
+Cogman server can pull task from any number of queues and processes them asynchronously.
 ```go
 srvr, err := cogman.NewServer(cfg)
 if err != nil {
@@ -79,7 +82,7 @@ go func() {
 Server must register the task handler before start processing them.
 
 ```go
-srvr.Register(exampletasks.TaskAddition, exampletasks.NewSumTask())
-srvr.Register(exampletasks.TaskSubtraction, exampletasks.NewSubTask())
-srvr.Register(exampletasks.TaskMultiplication, exampletasks.NewSubTask())
+srvr.Register(exampleTasks.TaskAddition, exampletasks.NewSumTask())
+srvr.Register(exampleTasks.TaskSubtraction, exampletasks.NewSubTask())
+srvr.Register(exampleTasks.TaskMultiplication, exampletasks.NewSubTask())
 ```

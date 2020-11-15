@@ -110,7 +110,7 @@ func (s *Server) GetTaskHandler(taskName string) util.Handler {
 	return s.workers[taskName].Handler()
 }
 
-// Start will star task consumer, mongo & redis connection.
+// Start will start task consumer, mongo & redis connection
 func (s *Server) Start() error {
 	s.mu.Lock()
 
@@ -200,7 +200,7 @@ func (s *Server) Start() error {
 }
 
 func ensureQueue(con *amqp.Connection, queue string, taskType util.TaskPriority) error {
-	chnl, err := con.Channel()
+	channel, err := con.Channel()
 	if err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ func ensureQueue(con *amqp.Connection, queue string, taskType util.TaskPriority)
 		mode = util.QueueModeDefault
 	}
 
-	_, err = chnl.QueueDeclare(
+	_, err = channel.QueueDeclare(
 		queue,
 		true,
 		false,
@@ -224,7 +224,7 @@ func ensureQueue(con *amqp.Connection, queue string, taskType util.TaskPriority)
 		return err
 	}
 
-	return chnl.Close()
+	return channel.Close()
 }
 
 func (s *Server) bootstrap() error {
@@ -325,8 +325,7 @@ func (s *Server) connect(ctx context.Context) error {
 	return nil
 }
 
-// Stop close all the connection of Cogman server.
-// It should be defer from the method Cogman server initiated
+// Stop closes all the connection of Cogman server
 func (s *Server) Stop() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -57,7 +57,7 @@ if err := cogman.SendTask(*task, handler); err != nil {
 
 #### HandlerFunc 
 
-A function type `HandlerFunc` also can pass as handler. 
+A function type `HandlerFunc` also can passed as handler. 
 
 ```go
 type HandlerFunc func(ctx context.Context, payload []byte) error
