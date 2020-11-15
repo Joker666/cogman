@@ -2,7 +2,7 @@
 set -e
 
 PROJ="cogman"
-ORG_PATH="github.com/Tapfury"
+ORG_PATH="github.com/Joker666"
 REPO_PATH="${ORG_PATH}/${PROJ}"
 
 if ! [ -x "$(command -v go)" ]; then
