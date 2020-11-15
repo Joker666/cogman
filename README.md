@@ -1,18 +1,24 @@
-[![CircleCI](https://circleci.com/gh/Joker666/cogman.svg?style=svg)](https://circleci.com/gh/Joker666/cogman) [![Go Report Card](https://goreportcard.com/badge/Joker666/cogman)](https://goreportcard.com/report/github.com/Joker666/cogman) [![GitHub](https://img.shields.io/github/license/Joker666/cogman)](https://github.com/Joker666/cogman/blob/master/LICENSE)
-![logo](https://i.imgur.com/by0sIiG.png) [![godoc for Joker666/cogman](https://godoc.org/github.com/nathany/looper?status.svg)](http://godoc.org/github.com/Joker666/cogman)
+[![CircleCI](https://circleci.com/gh/Joker666/cogman.svg?style=svg)](https://circleci.com/gh/Joker666/cogman) [![Go Report Card](https://goreportcard.com/badge/Joker666/cogman)](https://goreportcard.com/report/github.com/Joker666/cogman) [![GitHub](https://img.shields.io/github/license/Joker666/cogman)](https://github.com/Joker666/cogman/blob/master/LICENSE) [![godoc for Joker666/cogman](https://godoc.org/github.com/nathany/looper?status.svg)](http://godoc.org/github.com/Joker666/cogman)
+
+![logo](https://i.imgur.com/by0sIiG.png)
 
 <h1 align="center"> Cogman </h1>
 
-A distributed task runner.
+A distributed task runner
 
 ---
 
-### Clone & Build: 
+### How to use: 
+First add it to `$GOPATH`
+
 ```
 go get github.com/Joker666/cogman
-cd cogman
-./build.sh
 ```
+
+Then add [configuration](#Config) for rabbitmq for messaging, redis as backend, optionally mongodb as backend for re-enqueuing feature. <br />
+Start the server to consume the tasks and start the client session to send tasks to server. [Start server and client](#clientserver).  <br />
+Write [task handlers](#workertask-handler) and [register](#register-the-handlers) them.
+[Send the tasks](#send-task) to process.
 
 ### Requirements
 - Go
@@ -33,6 +39,12 @@ cd cogman
 - [x] Handle reconnection
 - [ ] UI
 - [x] Rest API
+
+#### Implementation
+- [Simple use](https://github.com/Joker666/cogman/tree/master/example/simple)
+- [Queue type](https://github.com/Joker666/cogman/tree/master/example/queue)
+- [Client & Server](https://github.com/Joker666/cogman/tree/master/example/client-server)
+- [Task & Task Handler](https://github.com/Joker666/cogman/tree/master/example/tasks)
 
 ### Example
 ---
@@ -70,7 +82,7 @@ if err := cogman.StartBackground(cfg); err != nil {
 }
 ```
 
-Initiate Client & Server individually:
+Instead, if you want you can initiate Client & Server individually:
 
 ```go
 // Client
@@ -127,7 +139,7 @@ Any struct can be passed as a handler it implements below `interface`:
 type Handler interface {
 	Do(ctx context.Context, payload []byte) error
 }
-``` 
+```
 
 A function type `HandlerFunc` also can pass as handler.
 
@@ -137,6 +149,13 @@ type HandlerFunc func(ctx context.Context, payload []byte) error
 func (h HandlerFunc) Do(ctx context.Context, payload []byte) error {
 	return h(ctx, payload)
 }
+```
+
+#### Register The Handlers
+```go
+// Register task handler from Server side
+server.Register(taskName, handler)
+server.Register(taskName, handlerFunc)
 ```
 
 #### Send Task
@@ -152,15 +171,11 @@ if err := cogman.SendTask(*task, nil); err != nil {
 	log.Fatal(err)
 }
 
-``` 
+```
 
 Sending task using Cogman Client/Server:
 
 ```go
-// Register task handler from Server side
-server.Register(taskName, handler)
-server.Register(taskName, handlerFunc)
-
 // Sending task from client
 if err := client.SendTask(task); err != nil {
     return err
@@ -195,12 +210,6 @@ All offline task will be re-queue after connection re-established.
 Cogman fetches all the offline tasks from mongo logs, and re-initiate them. Mongo connection required here.
 For re-enqueuing, task retry count would not change.
 
-#### Implementation
-- [Simple use](https://github.com/Joker666/cogman/tree/master/example/simple)
-- [Queue type](https://github.com/Joker666/cogman/tree/master/example/queue)
-- [Client & Server](https://github.com/Joker666/cogman/tree/master/example/client-server)
-- [Task & Task Handler](https://github.com/Joker666/cogman/tree/master/example/tasks)
-
 
 ### Feature Comparison
 
@@ -221,5 +230,26 @@ Comparison among the other job/task process runner.
 | Rest API                 |      ✓      |               |
 | Chain                    |             | ✓             |
 | Chords                   |             | ✓             |
-| Groups                   |             | ✓             |  
- 
+| Groups                   |             | ✓             |
+
+
+## Contribution
+Want to contribute? Great!
+
+To fix a bug or enhance an existing module, follow these steps:
+
+- Fork the repo
+- Create a new branch (`git checkout -b improve-feature`)
+- Make the appropriate changes in the files
+- Add changes to reflect the changes made
+- Commit your changes (`git commit -am 'Improve feature'`)
+- Push to the branch (`git push origin improve-feature`)
+- Create a Pull Request 
+
+### Bug / Feature Request
+If you find a bug, kindly open an issue [here](https://github.com/Joker666/cogman/issues/new).<br/>
+If you'd like to request/add a new function, feel free to do so by opening an issue [here](https://github.com/Joker666/cogman/issues/new). 
+
+## [License](https://github.com/Joker666/cogman/blob/master/LICENSE.md)
+
+MIT © [MD Ahad Hasan](https://github.com/joker666)
