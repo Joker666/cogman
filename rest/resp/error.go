@@ -3,7 +3,7 @@ package resp
 import (
 	"net/http"
 
-	"github.com/Tapfury/cogman/util"
+	"github.com/Joker666/cogman/util"
 )
 
 type CogmanError error

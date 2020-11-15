@@ -6,10 +6,10 @@ import (
 	"log"
 	"time"
 
-	"github.com/Tapfury/cogman"
-	"github.com/Tapfury/cogman/config"
-	exampletasks "github.com/Tapfury/cogman/example/tasks"
-	"github.com/Tapfury/cogman/util"
+	"github.com/Joker666/cogman"
+	"github.com/Joker666/cogman/config"
+	exampleTasks "github.com/Joker666/cogman/example/tasks"
+	"github.com/Joker666/cogman/util"
 )
 
 func main() {
@@ -35,11 +35,11 @@ func main() {
 	// If a task register by a handler, task with same name can
 	// use that handler without sending it again.
 
-	task, err := exampletasks.GetMultiplicationTask(21, 7, util.TaskPriorityLow, 1)
+	task, err := exampleTasks.GetMultiplicationTask(21, 7, util.TaskPriorityLow, 1)
 	if err != nil {
 		log.Fatal(err)
 	}
-	handler := exampletasks.NewMulTask()
+	handler := exampleTasks.NewMulTask()
 	if err := cogman.SendTask(*task, handler); err != nil {
 		log.Fatal(err)
 	}
@@ -48,13 +48,13 @@ func main() {
 	log.Print("========================================>")
 
 	// task can be registered before hand using register api.
-	handler = exampletasks.NewSumTask()
-	err = cogman.Register(exampletasks.TaskAddition, handler)
+	handler = exampleTasks.NewSumTask()
+	err = cogman.Register(exampleTasks.TaskAddition, handler)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	task, err = exampletasks.GetAdditionTask(12, 31, util.TaskPriorityHigh, 2)
+	task, err = exampleTasks.GetAdditionTask(12, 31, util.TaskPriorityHigh, 2)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -65,12 +65,12 @@ func main() {
 	time.Sleep(time.Second * 3)
 	log.Print("========================================>")
 
-	task, err = exampletasks.GetSubtractionTask(324, 35, util.TaskPriorityHigh, 1)
+	task, err = exampleTasks.GetSubtractionTask(324, 35, util.TaskPriorityHigh, 1)
 	if err != nil {
 		log.Fatal(err)
 	}
 	handlerFunc := util.HandlerFunc(func(ctx context.Context, payload []byte) error {
-		var body exampletasks.TaskBody
+		var body exampleTasks.TaskBody
 		if err := json.Unmarshal(payload, &body); err != nil {
 			log.Print("Sub task process error", err)
 			return err

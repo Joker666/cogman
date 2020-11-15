@@ -2,7 +2,7 @@ package config
 
 import "time"
 
-// Config : Cogman API congig
+// Config : Cogman API config
 type Config struct {
 	ConnectionTimeout time.Duration
 	RequestTimeout    time.Duration

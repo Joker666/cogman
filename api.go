@@ -4,14 +4,14 @@ import (
 	"log"
 	"time"
 
-	"github.com/Tapfury/cogman/client"
-	"github.com/Tapfury/cogman/config"
-	"github.com/Tapfury/cogman/util"
+	"github.com/Joker666/cogman/client"
+	"github.com/Joker666/cogman/config"
+	"github.com/Joker666/cogman/util"
 )
 
 var (
-	srvr    *Server
-	clnt    *client.Session
+	server        *Server
+	clientSession *client.Session
 )
 
 func StartBackground(cfg *config.Config) error {
@@ -20,23 +20,23 @@ func StartBackground(cfg *config.Config) error {
 		return err
 	}
 
-	clnt, err = client.NewSession(*clientCfg)
+	clientSession, err = client.NewSession(*clientCfg)
 	if err != nil {
 		return err
 	}
 
-	if err := clnt.Connect(); err != nil {
+	if err := clientSession.Connect(); err != nil {
 		return err
 	}
 
-	srvr, err = NewServer(*serverCfg)
+	server, err = NewServer(*serverCfg)
 	if err != nil {
 		return err
 	}
 
 	go func() {
-		defer srvr.Stop()
-		if err = srvr.Start(); err != nil {
+		defer server.Stop()
+		if err = server.Start(); err != nil {
 			log.Print(err)
 		}
 	}()
@@ -51,15 +51,15 @@ func SendTask(task util.Task, hdlr util.Handler) error {
 		}
 	}
 
-	return clnt.SendTask(task)
+	return clientSession.SendTask(task)
 }
 
-func Register(taskName string, hdlr util.Handler) error {
-	if hdlr == nil || taskName == "" {
+func Register(taskName string, handler util.Handler) error {
+	if handler == nil || taskName == "" {
 		return ErrInvalidData
 	}
 
-	return srvr.Register(taskName, hdlr)
+	return server.Register(taskName, handler)
 }
 
 func setConfig(cfg *config.Config) (*config.Server, *config.Client, error) {
@@ -67,21 +67,21 @@ func setConfig(cfg *config.Config) (*config.Server, *config.Client, error) {
 		cfg = &config.Config{}
 	}
 
-	srvrCfg := &config.Server{}
-	clntCfg := &config.Client{}
+	serverCfg := &config.Server{}
+	clientCfg := &config.Client{}
 
 	if cfg.ConnectionTimeout == 0 {
 		cfg.ConnectionTimeout = time.Minute * 10
 	}
 
-	srvrCfg.ConnectionTimeout = cfg.ConnectionTimeout
-	clntCfg.ConnectionTimeout = cfg.ConnectionTimeout
+	serverCfg.ConnectionTimeout = cfg.ConnectionTimeout
+	clientCfg.ConnectionTimeout = cfg.ConnectionTimeout
 
 	if cfg.RequestTimeout == 0 {
 		cfg.RequestTimeout = time.Second * 5
 	}
 
-	clntCfg.RequestTimeout = cfg.RequestTimeout
+	clientCfg.RequestTimeout = cfg.RequestTimeout
 
 	if cfg.AmqpURI == "" {
 		return nil, nil, ErrInvalidConfig
@@ -95,8 +95,8 @@ func setConfig(cfg *config.Config) (*config.Server, *config.Client, error) {
 		Prefetch:               cfg.Prefetch,
 	}
 
-	srvrCfg.AMQP = amqp
-	clntCfg.AMQP = amqp
+	serverCfg.AMQP = amqp
+	clientCfg.AMQP = amqp
 
 	if cfg.RedisURI == "" {
 		return nil, nil, ErrInvalidConfig
@@ -106,17 +106,17 @@ func setConfig(cfg *config.Config) (*config.Server, *config.Client, error) {
 		cfg.RedisTTL = time.Hour * 24 * 7 // 1 week
 	}
 
-	srvrCfg.Redis = config.Redis{URI: cfg.RedisURI, TTL: cfg.RedisTTL}
-	clntCfg.Redis = config.Redis{URI: cfg.RedisURI, TTL: cfg.RedisTTL}
+	serverCfg.Redis = config.Redis{URI: cfg.RedisURI, TTL: cfg.RedisTTL}
+	clientCfg.Redis = config.Redis{URI: cfg.RedisURI, TTL: cfg.RedisTTL}
 
 	if cfg.MongoTTL == 0 {
 		cfg.MongoTTL = time.Hour * 24 * 30 // 1  month
 	}
 
-	srvrCfg.Mongo = config.Mongo{URI: cfg.MongoURI, TTL: cfg.MongoTTL}
-	clntCfg.Mongo = config.Mongo{URI: cfg.MongoURI, TTL: cfg.MongoTTL}
+	serverCfg.Mongo = config.Mongo{URI: cfg.MongoURI, TTL: cfg.MongoTTL}
+	clientCfg.Mongo = config.Mongo{URI: cfg.MongoURI, TTL: cfg.MongoTTL}
 
-	return srvrCfg, clntCfg, nil
+	return serverCfg, clientCfg, nil
 }
 
 func max(x int, y int) int {

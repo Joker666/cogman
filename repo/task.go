@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/Tapfury/cogman/infra"
-	"github.com/Tapfury/cogman/util"
+	"github.com/Joker666/cogman/infra"
+	"github.com/Joker666/cogman/util"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -198,16 +198,16 @@ func (s *TaskRepository) GetTask(id string) (*util.Task, error) {
 		return nil, ErrRedisNoConnection
 	}
 
-	byts, err := s.RedisConn.Get(id)
+	bytes, err := s.RedisConn.Get(id)
 	if err != nil {
 		return nil, err
 	}
-	if byts == nil {
+	if bytes == nil {
 		return nil, ErrTaskNotFound
 	}
 
 	task := &util.Task{}
-	if err := json.Unmarshal(byts, &task); err != nil {
+	if err := json.Unmarshal(bytes, &task); err != nil {
 		return nil, err
 	}
 	return task, nil
@@ -539,7 +539,7 @@ func (s *TaskRepository) ListCountDateRangeInterval(startTime, endTime time.Time
 		}
 	}
 
-	bndr := mgoTimeRangeBucketBoundaries(startTime, endTime, interval)
+	boundary := mgoTimeRangeBucketBoundaries(startTime, endTime, interval)
 	q := []bson.M{
 		bson.M{
 			"$match": bson.M{
@@ -552,7 +552,7 @@ func (s *TaskRepository) ListCountDateRangeInterval(startTime, endTime time.Time
 		bson.M{
 			"$bucket": bson.M{
 				"groupBy":    "$created_at",
-				"boundaries": bndr,
+				"boundaries": boundary,
 				"default":    "Other",
 				"output": bson.M{
 					"total": bson.M{
@@ -589,8 +589,8 @@ func (s *TaskRepository) ListCountDateRangeInterval(startTime, endTime time.Time
 }
 
 func mgoTimeRangeBucketBoundaries(startDate, endDate time.Time, interval int) []time.Time {
-	bndr := []time.Time{}
-	bndr = append(bndr, startDate)
+	boundary := []time.Time{}
+	boundary = append(boundary, startDate)
 	intlDt := startDate
 	enDt := endDate
 	for {
@@ -598,8 +598,8 @@ func mgoTimeRangeBucketBoundaries(startDate, endDate time.Time, interval int) []
 		if intlDt.After(endDate) || intlDt.Equal(endDate) {
 			break
 		}
-		bndr = append(bndr, intlDt)
+		boundary = append(boundary, intlDt)
 	}
 
-	return append(bndr, enDt.AddDate(0, 0, 1))
+	return append(boundary, enDt.AddDate(0, 0, 1))
 }

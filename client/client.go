@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Tapfury/cogman/config"
-	"github.com/Tapfury/cogman/infra"
-	"github.com/Tapfury/cogman/repo"
-	"github.com/Tapfury/cogman/util"
+	"github.com/Joker666/cogman/config"
+	"github.com/Joker666/cogman/infra"
+	"github.com/Joker666/cogman/repo"
+	"github.com/Joker666/cogman/util"
 
 	"github.com/streadway/amqp"
 )
@@ -83,13 +83,13 @@ func (s *Session) Connect() error {
 	}
 
 	// redis connection
-	rcon := infra.NewRedisClient(s.cfg.Redis.URI, s.cfg.Redis.TTL)
-	if err := rcon.Ping(); err != nil {
+	rConn := infra.NewRedisClient(s.cfg.Redis.URI, s.cfg.Redis.TTL)
+	if err := rConn.Ping(); err != nil {
 		return err
 	}
 
 	// mongo connection
-	var mcon *infra.MongoClient
+	var mConn *infra.MongoClient
 	if s.cfg.Mongo.URI != "" {
 		con, err := infra.NewMongoClient(s.cfg.Mongo.URI, s.cfg.Mongo.TTL)
 		if err != nil {
@@ -100,14 +100,14 @@ func (s *Session) Connect() error {
 			return err
 		}
 
-		mcon = con
-		_, err = mcon.SetTTL()
+		mConn = con
+		_, err = mConn.SetTTL()
 		if err != nil {
 			return err
 		}
 	}
 
-	s.taskRepo = repo.NewTaskRepo(rcon, mcon)
+	s.taskRepo = repo.NewTaskRepo(rConn, mConn)
 
 	if s.cfg.Mongo.URI != "" {
 		if err := s.taskRepo.EnsureIndices(); err != nil {

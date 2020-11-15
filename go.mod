@@ -1,6 +1,6 @@
-module github.com/Tapfury/cogman
+module github.com/Joker666/cogman
 
-go 1.12
+go 1.15
 
 require (
 	github.com/go-stack/stack v1.8.0 // indirect

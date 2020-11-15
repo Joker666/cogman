@@ -4,9 +4,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/Tapfury/cogman"
-	"github.com/Tapfury/cogman/config"
-	exampletasks "github.com/Tapfury/cogman/example/tasks"
+	"github.com/Joker666/cogman"
+	"github.com/Joker666/cogman/config"
+	exampleTasks "github.com/Joker666/cogman/example/tasks"
 )
 
 func main() {
@@ -36,9 +36,9 @@ func main() {
 	}()
 
 	// Task handler register
-	_ = srvr.Register(exampletasks.TaskAddition, exampletasks.NewSumTask())
-	_ = srvr.Register(exampletasks.TaskSubtraction, exampletasks.NewSubTask())
-	_ = srvr.Register(exampletasks.TaskMultiplication, exampletasks.NewMulTask())
+	_ = srvr.Register(exampleTasks.TaskAddition, exampleTasks.NewSumTask())
+	_ = srvr.Register(exampleTasks.TaskSubtraction, exampleTasks.NewSubTask())
+	_ = srvr.Register(exampleTasks.TaskMultiplication, exampleTasks.NewMulTask())
 
 	log.Print("[x] press ctrl + c to terminate the program")
 	end := make(chan struct{})

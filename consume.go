@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Tapfury/cogman/util"
+	"github.com/Joker666/cogman/util"
 
 	"github.com/streadway/amqp"
 )

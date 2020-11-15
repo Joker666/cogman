@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Tapfury/cogman/client"
-	"github.com/Tapfury/cogman/repo"
-	cogman "github.com/Tapfury/cogman/repo"
-	"github.com/Tapfury/cogman/rest/resp"
-	"github.com/Tapfury/cogman/util"
+	"github.com/Joker666/cogman/client"
+	"github.com/Joker666/cogman/repo"
+	cogman "github.com/Joker666/cogman/repo"
+	"github.com/Joker666/cogman/rest/resp"
+	"github.com/Joker666/cogman/util"
 	"github.com/streadway/amqp"
 )
 
@@ -161,8 +161,8 @@ type queueInfo struct {
 }
 
 type amqpInfo struct {
-	TotalQueue int `json: "total_queue"`
-	TotalTask  int `json: "total_task"`
+	TotalQueue int `json:"total_queue"`
+	TotalTask  int `json:"total_task"`
 	Queue      []queueInfo
 }
 
@@ -174,18 +174,18 @@ func (s *cogmanHandler) info(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chnl, err := s.amqp.Channel()
+	channel, err := s.amqp.Channel()
 	if err != nil {
 		resp.ServeError(w, r, err)
 		return
 	}
-	defer chnl.Close()
+	defer channel.Close()
 
 	data := []queueInfo{}
 	totalTask := 0
 
 	for _, q := range s.queueName {
-		queue, err := chnl.QueueInspect(q)
+		queue, err := channel.QueueInspect(q)
 		if err != nil {
 			data = append(data, queueInfo{q, 0, err.Error()})
 			continue
@@ -200,7 +200,7 @@ func (s *cogmanHandler) info(w http.ResponseWriter, r *http.Request) {
 
 type TaskRetry struct {
 	TaskID string `json:"task_id"`
-	Retry  int    `json: "retry"`
+	Retry  int    `json:"retry"`
 }
 
 // retry will re initiate a fail job

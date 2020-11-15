@@ -6,7 +6,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-// Handler is the task handler stuct interface
+// Handler is the task handler struct interface
 type Handler interface {
 	Do(ctx context.Context, payload []byte) error
 }

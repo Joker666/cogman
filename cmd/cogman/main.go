@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/Tapfury/cogman"
-	"github.com/Tapfury/cogman/config"
-	"github.com/Tapfury/cogman/version"
+	"github.com/Joker666/cogman"
+	"github.com/Joker666/cogman/config"
+	"github.com/Joker666/cogman/version"
 )
 
 func main() {

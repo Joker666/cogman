@@ -4,10 +4,10 @@ import (
 	"log"
 	"time"
 
-	cogman "github.com/Tapfury/cogman/client"
-	"github.com/Tapfury/cogman/config"
-	exampletasks "github.com/Tapfury/cogman/example/tasks"
-	"github.com/Tapfury/cogman/util"
+	cogman "github.com/Joker666/cogman/client"
+	"github.com/Joker666/cogman/config"
+	exampleTasks "github.com/Joker666/cogman/example/tasks"
+	"github.com/Joker666/cogman/util"
 )
 
 func main() {
@@ -50,34 +50,34 @@ func main() {
 	<-end
 }
 
-func SendExampleTask(clnt *cogman.Session) error {
+func SendExampleTask(client *cogman.Session) error {
 	log.Printf("========================================>")
 
-	task, err := exampletasks.GetAdditionTask(234, 435, util.TaskPriorityHigh, 3)
+	task, err := exampleTasks.GetAdditionTask(234, 435, util.TaskPriorityHigh, 3)
 	if err != nil {
 		return err
 	}
-	if err := clnt.SendTask(*task); err != nil {
+	if err := client.SendTask(*task); err != nil {
 		return err
 	}
 
 	log.Print("========================================>")
 
-	task, err = exampletasks.GetSubtractionTask(43, 23, util.TaskPriorityLow, 3)
+	task, err = exampleTasks.GetSubtractionTask(43, 23, util.TaskPriorityLow, 3)
 	if err != nil {
 		return err
 	}
-	if err := clnt.SendTask(*task); err != nil {
+	if err := client.SendTask(*task); err != nil {
 		return err
 	}
 
 	log.Print("========================================>")
 
-	task, err = exampletasks.GetMultiplicationTask(2, 24, util.TaskPriorityHigh, 3)
+	task, err = exampleTasks.GetMultiplicationTask(2, 24, util.TaskPriorityHigh, 3)
 	if err != nil {
 		return err
 	}
-	if err := clnt.SendTask(*task); err != nil {
+	if err := client.SendTask(*task); err != nil {
 		return err
 	}
 

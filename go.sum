@@ -17,6 +17,8 @@ github.com/RichardKnop/logging v0.0.0-20181101035820-b1d5d44c82d6/go.mod h1:rJJ8
 github.com/RichardKnop/machinery v1.6.4 h1:21A/W52chHaIABOiGxgQp7RHOAljmUYCwZDWCFDTkV0=
 github.com/RichardKnop/machinery v1.6.4/go.mod h1:+QjVq/Z0aWiTc1O0lq34oK9PY6NzYjxVNlLlgTaqoJE=
 github.com/RichardKnop/redsync v1.2.0/go.mod h1:9b8nBGAX3bE2uCfJGSnsDvF23mKyHTZzmvmj5FH3Tp0=
+github.com/Tapfury/cogman v0.0.0-20200103085043-49d8f3edb19c h1:y6I44R+8b87v3+lwN0LjEaZXqmk9hp3u4raUBIY81G8=
+github.com/Tapfury/cogman v0.0.0-20200103085043-49d8f3edb19c/go.mod h1:2Ezz0GwYZp0boLwCPWMzZZiIaYeUNAo/oTLgQRqBn/k=
 github.com/Tapfury/infobip v0.0.0-20190525081959-0c27a1442d1a/go.mod h1:gFP/xtqULfX+pqW+JpPd4pMM83dX883vWhMYHFH9hrw=
 github.com/Tapfury/onesignal-go v0.0.0-20190205112225-1aa6df26dc38/go.mod h1:g5eAwmpBoAuhP2NJrxSSx/l6HII9/QujyKu0n2SzSjI=
 github.com/Tapfury/phoneline-api v0.0.0-20190819093846-8d448ef95532 h1:DBmL2MyrqCKsq01f0kPty1UqJHeQRnNV26vbuoq5gew=

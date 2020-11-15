@@ -9,7 +9,7 @@ import (
 // RedisClient contain necessary field
 type RedisClient struct {
 	URL    string
-	rcon   *redis.Pool
+	rConn  *redis.Pool
 	ExpDur int64
 }
 
@@ -18,7 +18,7 @@ func NewRedisClient(url string, ttl time.Duration) *RedisClient {
 	return &RedisClient{
 		URL:    url,
 		ExpDur: int64(ttl.Seconds()),
-		rcon: &redis.Pool{
+		rConn: &redis.Pool{
 			MaxIdle:     5,
 			IdleTimeout: 300 * time.Second,
 			Dial: func() (redis.Conn, error) {
@@ -30,7 +30,7 @@ func NewRedisClient(url string, ttl time.Duration) *RedisClient {
 
 // Ping check the redis connection
 func (s *RedisClient) Ping() error {
-	conn := s.rcon.Get()
+	conn := s.rConn.Get()
 	if conn == nil {
 		return ErrNotConnected
 	}
@@ -45,12 +45,12 @@ func (s *RedisClient) Ping() error {
 
 // Close close the redis connection
 func (s *RedisClient) Close() error {
-	return s.rcon.Close()
+	return s.rConn.Close()
 }
 
 // Get return a byte string based on key
 func (s *RedisClient) Get(key string) ([]byte, error) {
-	conn := s.rcon.Get()
+	conn := s.rConn.Get()
 	if conn == nil {
 		return nil, ErrNotConnected
 	}
@@ -69,7 +69,7 @@ func (s *RedisClient) Get(key string) ([]byte, error) {
 
 // Create create a new object
 func (s *RedisClient) Create(key string, t []byte) error {
-	conn := s.rcon.Get()
+	conn := s.rConn.Get()
 	if conn == nil {
 		return ErrNotConnected
 	}
@@ -85,7 +85,7 @@ func (s *RedisClient) Create(key string, t []byte) error {
 
 // Update will update the object
 func (s *RedisClient) Update(key string, t []byte) error {
-	conn := s.rcon.Get()
+	conn := s.rConn.Get()
 	if conn == nil {
 		return ErrNotConnected
 	}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/Tapfury/cogman/util"
+	"github.com/Joker666/cogman/util"
 
 	"github.com/google/uuid"
 	"github.com/streadway/amqp"

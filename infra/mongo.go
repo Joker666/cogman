@@ -14,10 +14,10 @@ import (
 const (
 	database   = "cogman"
 	tableTasks = "tasks"
-	session_id = "session_id"
+	sessionId  = "session_id"
 )
 
-// MongoClient contaiend required field
+// MongoClient contains required field
 type MongoClient struct {
 	URL    string
 	ExpDur int32
@@ -43,6 +43,7 @@ func NewMongoClient(url string, ttl time.Duration) (*MongoClient, error) {
 	}, nil
 }
 
+// StartTransaction starts the transaction
 func (m *MongoClient) StartTransaction(ctx context.Context, id string) (context.Context, error) {
 	sess, err := m.mcl.StartSession()
 	if err != nil {
@@ -52,10 +53,11 @@ func (m *MongoClient) StartTransaction(ctx context.Context, id string) (context.
 		return ctx, err
 	}
 	m.sess.Store(id, sess)
-	ctx = context.WithValue(ctx,  session_id, id)
+	ctx = context.WithValue(ctx, sessionId, id)
 	return ctx, nil
 }
 
+// CommitTransaction finishes the transaction
 func (m *MongoClient) CommitTransaction(ctx context.Context) (interface{}, error) {
 	id := getSessionID(ctx)
 	result, ok := m.sess.Load(id)
@@ -71,6 +73,7 @@ func (m *MongoClient) CommitTransaction(ctx context.Context) (interface{}, error
 	return nil, nil
 }
 
+// AbortTransaction aborts a transaction
 func (m *MongoClient) AbortTransaction(ctx context.Context) (interface{}, error)  {
 	id := getSessionID(ctx)
 	result, ok := m.sess.Load(id)
@@ -109,7 +112,7 @@ func (m *MongoClient) SetTTL() (interface{}, error) {
 
 	model := mongo.IndexModel{
 		Keys: bson.D{
-			bson.E{"created_at", 1},
+			bson.E{Key: "created_at", Value: 1},
 		},
 		Options: opts,
 	}
@@ -123,7 +126,7 @@ type IndexKey struct {
 	Desc bool
 }
 
-// Index reprsents a mongodb index
+// Index represents a mongodb index
 type Index struct {
 	Keys   []IndexKey
 	Name   string
@@ -138,7 +141,7 @@ func (i *Index) model() mongo.IndexModel {
 		if k.Desc {
 			d = -1
 		}
-		keys = append(keys, bson.E{k.Key, d})
+		keys = append(keys, bson.E{Key: k.Key, Value: d})
 	}
 
 	opts := &options.IndexOptions{}
@@ -382,9 +385,8 @@ func (m *MongoClient) Aggregate(ctx context.Context, q interface{}) (*mongo.Curs
 	return cursor, nil
 }
 
-
 func getSessionID(ctx context.Context) string {
-	val := ctx.Value(session_id)
+	val := ctx.Value(sessionId)
 	if val == nil {
 		return ""
 	}

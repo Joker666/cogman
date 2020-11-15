@@ -4,10 +4,10 @@ import (
 	"log"
 	"time"
 
-	"github.com/Tapfury/cogman"
-	"github.com/Tapfury/cogman/config"
-	exampletasks "github.com/Tapfury/cogman/example/tasks"
-	"github.com/Tapfury/cogman/util"
+	"github.com/Joker666/cogman"
+	"github.com/Joker666/cogman/config"
+	exampleTasks "github.com/Joker666/cogman/example/tasks"
+	"github.com/Joker666/cogman/util"
 )
 
 // Low priority task will be pushed to low priority queue
@@ -44,13 +44,13 @@ func main() {
 	// Any number of task handler can be register
 	// Task name must be unique
 
-	_ = cogman.Register(exampletasks.TaskAddition, exampletasks.NewSumTask())
-	_ = cogman.Register(exampletasks.TaskSubtraction, exampletasks.NewSubTask())
+	_ = cogman.Register(exampleTasks.TaskAddition, exampleTasks.NewSumTask())
+	_ = cogman.Register(exampleTasks.TaskSubtraction, exampleTasks.NewSubTask())
 
 	time.Sleep(time.Second * 3)
 	log.Print("========================================>")
 
-	task, err := exampletasks.GetAdditionTask(9, 9, util.TaskPriorityHigh, 3)
+	task, err := exampleTasks.GetAdditionTask(9, 9, util.TaskPriorityHigh, 3)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func main() {
 	time.Sleep(time.Second * 3)
 	log.Print("========================================>")
 
-	task, err = exampletasks.GetSubtractionTask(10, 100, util.TaskPriorityLow, 0)
+	task, err = exampleTasks.GetSubtractionTask(10, 100, util.TaskPriorityLow, 0)
 	if err != nil {
 		log.Fatal(err)
 	}

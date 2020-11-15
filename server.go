@@ -6,12 +6,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Tapfury/cogman/client"
-	"github.com/Tapfury/cogman/config"
-	"github.com/Tapfury/cogman/infra"
-	"github.com/Tapfury/cogman/repo"
-	"github.com/Tapfury/cogman/rest"
-	"github.com/Tapfury/cogman/util"
+	"github.com/Joker666/cogman/client"
+	"github.com/Joker666/cogman/config"
+	"github.com/Joker666/cogman/infra"
+	"github.com/Joker666/cogman/repo"
+	"github.com/Joker666/cogman/rest"
+	"github.com/Joker666/cogman/util"
 
 	"github.com/streadway/amqp"
 )
@@ -122,7 +122,7 @@ func (s *Server) Start() error {
 		return ErrRunningServer
 	}
 
-	s.lgr.Debug("bootstraping server")
+	s.lgr.Debug("bootstrapping server")
 	if err := s.bootstrap(); err != nil {
 		s.mu.Unlock()
 		s.lgr.Error("failed to bootstrap", err)

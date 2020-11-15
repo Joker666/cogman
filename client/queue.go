@@ -3,7 +3,7 @@ package client
 import (
 	"strconv"
 
-	"github.com/Tapfury/cogman/util"
+	"github.com/Joker666/cogman/util"
 
 	"github.com/streadway/amqp"
 )
@@ -64,18 +64,18 @@ func (s *Session) GetQueueName(pType util.TaskPriority) (string, error) {
 }
 
 func (s *Session) EnsureQueue(con *amqp.Connection, queue string, taskType util.TaskPriority) (*amqp.Queue, error) {
-	chnl, err := con.Channel()
+	channel, err := con.Channel()
 	if err != nil {
 		return nil, err
 	}
-	defer chnl.Close()
+	defer channel.Close()
 
 	mode := util.QueueModeLazy
 	if taskType == util.TaskPriorityHigh {
 		mode = util.QueueModeDefault
 	}
 
-	qu, err := chnl.QueueDeclare(
+	qu, err := channel.QueueDeclare(
 		queue,
 		true,
 		false,
