@@ -55,6 +55,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 	wg := sync.WaitGroup{}
 	var closeErr error
 
+	s.lgr.Debug("waiting for tasks")
 	// waiting for task response from queue consumer.
 	for {
 		var msg amqp.Delivery
@@ -160,7 +161,7 @@ func (s *Server) consume(ctx context.Context, prefetch int) error {
 
 // setConsumer set a consumer for each single queue.
 func (s *Server) setConsumer(ctx context.Context, queue, mode string, prefetch int, taskPool chan<- amqp.Delivery) {
-	channel, err := s.acon.Channel()
+	channel, err := s.aConn.Channel()
 	if err != nil {
 		s.lgr.Error("failed to create channel", err)
 		return

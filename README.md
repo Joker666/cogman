@@ -2,13 +2,24 @@
 
 ![logo](https://i.imgur.com/by0sIiG.png)
 
-<h1 align="center"> Cogman </h1>
+## Table of Contents
+- [How to Use](#how-to-use)
+- [Motivation](#motivation)
+- [Requirements](#requirements)
+- [Features](#features)
+- [Examples](#examples)
+- [Setup](#setup)
+    - [Config](#config)
+    - [Client/Server](#clientserver)
+    - [Task](#ask)
+    - [Worker/Task Hander](#workertask-handler)
+    - [Register The Handlers](#register-the-handlers)
+    - [Send task](#send-task)
+- [Feature Comparison](#feature-comparison)
+- [Contribution](#contribution)
+- [License](#license)
 
-A distributed task runner
-
----
-
-### How to use: 
+## How to use: 
 First add it to `$GOPATH`
 
 ```
@@ -19,14 +30,23 @@ Then add [configuration](#Config) for rabbitmq for messaging, redis as backend, 
 Start the server to consume the tasks and start the client session to send tasks to server. [Start server and client](#clientserver).  <br />
 Write [task handlers](#workertask-handler) and [register](#register-the-handlers) them.
 [Send the tasks](#send-task) to process.
+And voila!, you have setup the simplest background processing job server.
 
-### Requirements
+You should see something like this when everything is up and running
+![List of services](https://i.imgur.com/AyIJkW8.png)
+
+## Motivation
+In python world you have [Celery](https://github.com/celery/celery), in Ruby world you have [Resque](https://github.com/resque/resque), [SideKiq](https://github.com/mperham/sidekiq), in C# [Hangfire](https://github.com/HangfireIO/Hangfire). All of them had one thing in common, simple interface to get started. When building products in Golang, this was apparent that, there is no library with a simple interface. We have Machinery, which is an excellent library, but has a steep learning curve. Also it has tonnes of features backed in that you do not need and but is required anyway.
+
+Also the way it handled processing of future tasks with RabbitMQ's [Dead Letter Exchange](https://www.rabbitmq.com/dlx.html), we were not very fond of it. So we decided to make our own job processing library. This is a opinionated library as it uses [RabbitMQ](https://www.rabbitmq.com/) as the message broker and [Redis](https://redis.io/) and optionally [MongoDB](https://www.mongodb.com/) backend for more features. This setup has worked great for us in production and under stress and I believe this can work for large tasks as well
+
+## Requirements
 - Go
 - RabbitMQ  
 - Redis  
 - MongoDB (optional)
 
-### Features
+## Features
 
 - [x] Task Priority
 - [x] Persistence
@@ -36,20 +56,18 @@ Write [task handlers](#workertask-handler) and [register](#register-the-handlers
 - [x] Concurrency
 - [x] Redis and Mongo log
 - [x] [Re-enqueue](#re-enqueue) recovered task
-- [x] Handle reconnection
+- [x] Handle [Reconnection](#re-connection)
 - [ ] UI
 - [x] Rest API
 
-#### Implementation
+## Examples
 - [Simple use](https://github.com/Joker666/cogman/tree/master/example/simple)
 - [Queue type](https://github.com/Joker666/cogman/tree/master/example/queue)
 - [Client & Server](https://github.com/Joker666/cogman/tree/master/example/client-server)
 - [Task & Task Handler](https://github.com/Joker666/cogman/tree/master/example/tasks)
 
-### Example
----
-
-#### Config 
+## Setup
+### Config 
 
 Cogman api config example.
 ```go
@@ -72,7 +90,7 @@ cfg := &config.Config{
 
 Client & Server have individual config file to use them separately.
 
-#### Client/Server
+### Client/Server
 
 This Cogman api call will start a client and a server.
 
@@ -110,7 +128,7 @@ go func() {
 
 ```
 
-#### Task
+### Task
 Tasks are grouped by two priority level. Based on that it will be assigned to a queue.
 
 ```go
@@ -131,7 +149,7 @@ type Task struct {
 }
 ```
 
-#### Worker/Task Handler
+### Worker/Task Handler
 
 Any struct can be passed as a handler it implements below `interface`:
 
@@ -151,14 +169,14 @@ func (h HandlerFunc) Do(ctx context.Context, payload []byte) error {
 }
 ```
 
-#### Register The Handlers
+### Register The Handlers
 ```go
 // Register task handler from Server side
 server.Register(taskName, handler)
 server.Register(taskName, handlerFunc)
 ```
 
-#### Send Task
+### Send Task
 
 Sending task using Cogman API:
 ```go
@@ -166,7 +184,7 @@ if err := cogman.SendTask(*task, handler); err != nil {
 	log.Fatal(err)
 }
 
-// If a task handler already registered for the task, task handler wont required further.
+// If a task handler is already registered, you can pass nil.
 if err := cogman.SendTask(*task, nil); err != nil {
 	log.Fatal(err)
 }
@@ -182,7 +200,7 @@ if err := client.SendTask(task); err != nil {
 }
 ```
 
-#### Queue
+### Queue
 
 Cogman queue type:
 
@@ -196,13 +214,13 @@ High priority tasks would be pushed to default queue and low priority task would
 The number of each type of queues can be set by client/server through configuration.
 Queue won't be lost after any sort of connection interruption.
 
-#### Re-Connection
+### Re-Connection
 
 Cogman Client & Server both handles reconnection. If the client loses connection, it can still take tasks,
 and those will be processed immediate after Cogman client gets back the connection.
 After Server reconnects, it will start to consume tasks without losing any task.
 
-#### Re-Enqueue
+### Re-Enqueue
 
 Re-enqueue feature to recover all the initiated task those are lost for connection error.
 If client somehow loses the amqp connection, Cogman can still take the task in offline.
@@ -211,7 +229,7 @@ Cogman fetches all the offline tasks from mongo logs, and re-initiate them. Mong
 For re-enqueuing, task retry count would not change.
 
 
-### Feature Comparison
+## Feature Comparison
 
 Comparison among the other job/task process runner.
 

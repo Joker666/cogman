@@ -82,6 +82,8 @@ func (s *Session) Connect() error {
 		return nil
 	}
 
+	s.lgr.Debug("starting client session")
+
 	// redis connection
 	rConn := infra.NewRedisClient(s.cfg.Redis.URI, s.cfg.Redis.TTL)
 	if err := rConn.Ping(); err != nil {
@@ -125,11 +127,13 @@ func (s *Session) Connect() error {
 		defer cancel()
 	}
 
+	s.lgr.Debug("connecting client")
 	err := s.connect(ctx)
 	if err != nil {
 		return err
 	}
 
+	s.lgr.Debug("client connected")
 	s.connected = true
 
 	// handle reconnection

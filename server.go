@@ -25,7 +25,7 @@ type Server struct {
 
 	cfg       *config.Server
 	taskRepo  *repo.TaskRepository
-	acon      *amqp.Connection
+	aConn     *amqp.Connection
 	retryConn *client.Session
 
 	workers map[string]*util.Worker
@@ -51,7 +51,7 @@ func NewServer(cfg config.Server) (*Server, error) {
 		cfg.Redis.TTL = time.Hour * 24 * 7 // 1 week
 	}
 
-	srvr := &Server{
+	server := &Server{
 		cfg:       &cfg,
 		quit:      make(chan struct{}),
 		done:      make(chan struct{}),
@@ -63,13 +63,13 @@ func NewServer(cfg config.Server) (*Server, error) {
 		taskRepo: &repo.TaskRepository{},
 	}
 
-	return srvr, nil
+	return server, nil
 }
 
 // newRetryClient create a cogman client.
 // fail task in server end will be retired using this.
 func newRetryClient(cfg *config.Server) (*client.Session, error) {
-	clntCfg := config.Client{
+	clientCfg := config.Client{
 		ConnectionTimeout: cfg.ConnectionTimeout,
 		RequestTimeout:    time.Second * 5, // TODO: need to update
 
@@ -80,7 +80,7 @@ func newRetryClient(cfg *config.Server) (*client.Session, error) {
 		ReEnqueue: false,
 	}
 
-	return client.NewSession(clntCfg)
+	return client.NewSession(clientCfg)
 }
 
 // Register register a task handler. taskName must be unique
@@ -136,7 +136,7 @@ func (s *Server) Start() error {
 		s.lgr.Debug("closing connections")
 		s.taskRepo.CloseClients()
 		_ = s.retryConn.Close()
-		_ = s.acon.Close()
+		_ = s.aConn.Close()
 		s.running = false
 	}()
 
@@ -145,7 +145,7 @@ func (s *Server) Start() error {
 	s.lgr.Debug("ensuring queue")
 	for i := 0; i < s.cfg.AMQP.HighPriorityQueueCount; i++ {
 		queue := formQueueName(util.HighPriorityQueue, i)
-		if err := ensureQueue(s.acon, queue, util.TaskPriorityHigh); err != nil {
+		if err := ensureQueue(s.aConn, queue, util.TaskPriorityHigh); err != nil {
 			s.lgr.Error("failed to ensure queue", err, util.Object{Key: "queue_name", Val: queue})
 			return err
 		}
@@ -156,7 +156,7 @@ func (s *Server) Start() error {
 
 	for i := 0; i < s.cfg.AMQP.LowPriorityQueueCount; i++ {
 		queue := formQueueName(util.LowPriorityQueue, i)
-		if err := ensureQueue(s.acon, queue, util.TaskPriorityLow); err != nil {
+		if err := ensureQueue(s.aConn, queue, util.TaskPriorityLow); err != nil {
 			s.lgr.Error("failed to ensure queue", err, util.Object{Key: "queue_name", Val: queue})
 			return err
 		}
@@ -168,7 +168,7 @@ func (s *Server) Start() error {
 	ctx, stop := context.WithCancel(context.Background())
 
 	restCfg := &rest.Config{
-		AmqpCon:   s.acon,
+		AmqpCon:   s.aConn,
 		Client:    s.retryConn,
 		TaskRep:   s.taskRepo,
 		Lgr:       s.lgr,
@@ -320,7 +320,7 @@ func (s *Server) connect(ctx context.Context) error {
 		return err
 	}
 
-	s.acon = conn
+	s.aConn = conn
 
 	return nil
 }
