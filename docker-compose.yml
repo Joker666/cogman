@@ -6,7 +6,7 @@ services:
     ports:
     - 27017:27017
     volumes:
-    - ./storage/mongo:/data/db
+    - ./.storage/mongo:/data/db
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: secret
@@ -15,7 +15,7 @@ services:
     image: rabbitmq:3-management-alpine
     restart: always
     volumes:
-    - ./storage/rabbitmq:/var/lib/rabbitmq
+    - ./.storage/rabbitmq:/var/lib/rabbitmq
     ports:
     - 5672:5672
     - 15672:15672
@@ -25,6 +25,6 @@ services:
     command: ["--appendonly", "yes"]
     restart: always
     volumes:
-    - ./storage/redis:/data
+    - ./.storage/redis:/data
     ports:
     - 6379:6379

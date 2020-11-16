@@ -1,6 +1,6 @@
 build
 vendor
-storage
+.storage
 .vscode
 *.env
 *.log
