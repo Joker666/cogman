@@ -2,7 +2,7 @@ version: '3.1'
 services:
   mongo:
     image: mongo:4
-    restart: always
+    restart: "no"
     ports:
     - 27017:27017
     volumes:
@@ -13,7 +13,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    restart: always
+    restart: "no"
     volumes:
     - ./.storage/rabbitmq:/var/lib/rabbitmq
     ports:
@@ -23,7 +23,7 @@ services:
   redis:
     image: redis:5-alpine
     command: ["--appendonly", "yes"]
-    restart: always
+    restart: "no"
     volumes:
     - ./.storage/redis:/data
     ports:
