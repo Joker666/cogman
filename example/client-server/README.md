@@ -57,10 +57,11 @@ cfg := config.Server{
     Redis: config.Redis{URI: "redis://localhost:6379/0", TTL: time.Hour},               // required
     AMQP: config.AMQP{
         URI:                    "amqp://localhost:5672",
-        HighPriorityQueueCount: 5,  // default
-        LowPriorityQueueCount:  5,  // default
+        HighPriorityQueueCount: 5,  // optional. default value 1
+        LowPriorityQueueCount:  5,  // optional. default value 1
         Exchange:               "", // Client and Server exchange should be same
     },
+    StartRestServer: true // optional. default value false
 }
 ```
 

@@ -30,7 +30,7 @@ Then add [configuration](#Config) for rabbitmq for messaging, redis as backend, 
 Start the server to consume the tasks and start the client session to send tasks to server. [Start server and client](#clientserver).  <br />
 Write [task handlers](#workertask-handler) and [register](#register-the-handlers) them.
 [Send the tasks](#send-task) to process.
-And voila!, you have setup the simplest background processing job server.
+And voila!, you have set up the simplest background processing job server.
 
 You should see something like this when everything is up and running
 ![List of services](https://i.imgur.com/AyIJkW8.png)
@@ -80,15 +80,16 @@ cfg := &config.Config{
     RedisURI: "redis://localhost:6379/0",               // required
     MongoURI: "mongodb://root:secret@localhost:27017/", // optional
 
-    RedisTTL: time.Hour * 24 * 7,  // default value 1 week
-    MongoTTL: time.Hour * 24 * 30, // default value 1 month
+    RedisTTL: time.Hour * 24 * 7,  // optional. default value 1 week
+    MongoTTL: time.Hour * 24 * 30, // optional. default value 1 month
 
-    HighPriorityQueueCount: 2,     // default value 1
-    LowPriorityQueueCount : 4,     // default value 1
+    HighPriorityQueueCount: 2,     // optional. default value 1
+    LowPriorityQueueCount : 4,     // optional. default value 1
+    StartRestServer:        true   // optional. default value false
 }
 ```
 
-Client & Server have individual config file to use them separately.
+Client & Server also has individual config file to use them separately.
 
 ### Client/Server
 

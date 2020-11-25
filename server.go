@@ -2,6 +2,7 @@ package cogman
 
 import (
 	"context"
+	"github.com/Joker666/cogman/rest"
 	"strconv"
 	"sync"
 	"time"
@@ -10,7 +11,6 @@ import (
 	"github.com/Joker666/cogman/config"
 	"github.com/Joker666/cogman/infra"
 	"github.com/Joker666/cogman/repo"
-	"github.com/Joker666/cogman/rest"
 	"github.com/Joker666/cogman/util"
 
 	"github.com/streadway/amqp"
@@ -167,17 +167,19 @@ func (s *Server) Start() error {
 
 	ctx, stop := context.WithCancel(context.Background())
 
-	restCfg := &rest.Config{
-		AmqpCon:   s.aConn,
-		Client:    s.retryConn,
-		TaskRep:   s.taskRepo,
-		Lgr:       s.lgr,
-		QueueName: queueName,
-	}
+	if s.cfg.StartRestServer {
+		restCfg := &rest.Config{
+			AmqpCon:   s.aConn,
+			Client:    s.retryConn,
+			TaskRep:   s.taskRepo,
+			Lgr:       s.lgr,
+			QueueName: queueName,
+		}
 
-	// Rest api server
-	go rest.StartRestServer(ctx, restCfg)
-	s.lgr.Info("rest server started", util.Object{Key: "port", Val: "8081"})
+		// Rest api server
+		go rest.StartRestServer(ctx, restCfg)
+		s.lgr.Info("rest server started at", util.Object{Key: "port", Val: "8081"})
+	}
 
 	// Task consume
 	go s.Consume(ctx, s.cfg.AMQP.Prefetch)

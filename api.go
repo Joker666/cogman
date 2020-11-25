@@ -119,6 +119,7 @@ func setConfig(cfg *config.Config) (*config.Server, *config.Client, error) {
 	serverCfg.Mongo = config.Mongo{URI: cfg.MongoURI, TTL: cfg.MongoTTL}
 	clientCfg.Mongo = config.Mongo{URI: cfg.MongoURI, TTL: cfg.MongoTTL}
 
+	serverCfg.StartRestServer = cfg.StartRestServer
 	return serverCfg, clientCfg, nil
 }
 

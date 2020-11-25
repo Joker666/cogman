@@ -17,15 +17,16 @@ type Config struct {
 	HighPriorityQueueCount int
 	LowPriorityQueueCount  int
 	Prefetch               int
+	StartRestServer        bool
 }
 
 // Server : Cogman server config
 type Server struct {
 	ConnectionTimeout time.Duration
-
-	Mongo Mongo
-	Redis Redis
-	AMQP  AMQP
+	StartRestServer   bool
+	Mongo             Mongo
+	Redis             Redis
+	AMQP              AMQP
 }
 
 // Client : Cogman client config

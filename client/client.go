@@ -24,7 +24,7 @@ type Session struct {
 	taskRepo *repo.TaskRepository
 
 	done   chan struct{}
-	reconn chan *amqp.Error
+	reConn chan *amqp.Error
 
 	lgr        util.Logger
 	queueIndex map[string]int
@@ -191,7 +191,7 @@ func (s *Session) connect(ctx context.Context) error {
 	}
 
 	s.conn = conn
-	s.reconn = s.conn.NotifyClose(make(chan *amqp.Error))
+	s.reConn = s.conn.NotifyClose(make(chan *amqp.Error))
 
 	return nil
 }
@@ -202,7 +202,7 @@ func (s *Session) handleReconnect() {
 		case <-s.done:
 			s.lgr.Info("Cogman Client: Connection closing.")
 			return
-		case err := <-s.reconn:
+		case err := <-s.reConn:
 			s.lgr.Error("Cogman Client: Connection reconnecting.", err)
 			s.connected = false
 		}

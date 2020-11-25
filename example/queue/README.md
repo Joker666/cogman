@@ -20,10 +20,10 @@ cfg := &config.Config{
 
     AmqpURI:  "amqp://localhost:5672",                  // required
     RedisURI: "redis://localhost:6379/0",               // required
-    MongoURI: "mongodb://root:secret@localhost:27017/", //optional
+    MongoURI: "mongodb://root:secret@localhost:27017/", // optional
 
-    HighPriorityQueueCount: 2, // Optional. Default value 1
-    LowPriorityQueueCount:  1, // Optional. Default value 1
+    HighPriorityQueueCount: 2, // optional. default value 1
+    LowPriorityQueueCount:  1, // optional. default value 1
 
     ReEnqueue: true, // optional. default false. Mongo connection also needed
 }
