@@ -81,7 +81,7 @@ func (s *Session) Connect() error {
 		return nil
 	}
 
-	s.lgr.Debug("starting client session")
+	s.lgr.Debug("Cogman Client: Starting client session")
 
 	// redis connection
 	rConn := infra.NewRedisClient(s.cfg.Redis.URI, s.cfg.Redis.TTL)
@@ -126,13 +126,12 @@ func (s *Session) Connect() error {
 		defer cancel()
 	}
 
-	s.lgr.Debug("connecting client")
+	s.lgr.Debug("Cogman Client: Connecting client")
 	err := s.connect(ctx)
 	if err != nil {
 		return err
 	}
 
-	s.lgr.Debug("client connected")
 	s.connected = true
 
 	// handle reconnection
@@ -153,14 +152,14 @@ func (s *Session) reEnqueue() {
 
 	// mongo connection required
 	if s.taskRepo.MongoConn == nil {
-		s.lgr.Warn("Failed to re-enqueue task. Mongo connection missing")
+		s.lgr.Warn("Cogman Client: Failed to re-enqueue task. Mongo connection missing")
 		return
 	}
 
 	nw := time.Now()
 	go func() {
 		if err := s.reEnqueueUnhandledTasksBefore(nw); err != nil {
-			s.lgr.Error("Error in re-enqueuing: ", err)
+			s.lgr.Error("Cogman Client: Error in re-enqueuing: ", err)
 		}
 	}()
 }
@@ -191,7 +190,7 @@ func (s *Session) connect(ctx context.Context) error {
 
 	s.conn = conn
 	s.reConn = s.conn.NotifyClose(make(chan *amqp.Error))
-
+	s.lgr.Info("Cogman Client: Connected to AMQP")
 	return nil
 }
 
@@ -199,10 +198,10 @@ func (s *Session) handleReconnect() {
 	for {
 		select {
 		case <-s.done:
-			s.lgr.Info("Cogman Client: Connection closing.")
+			s.lgr.Info("Cogman Client: Connection closing")
 			return
 		case err := <-s.reConn:
-			s.lgr.Error("Cogman Client: Connection reconnecting.", err)
+			s.lgr.Error("Cogman Client: Connection reconnecting", err)
 			s.connected = false
 		}
 
@@ -219,7 +218,7 @@ func (s *Session) handleReconnect() {
 		for {
 			select {
 			case <-done:
-				s.lgr.Warn("Cogman Client: failed to reconnect. client closing")
+				s.lgr.Warn("Cogman Client: failed to reconnect. Client closing")
 				return
 			case <-time.After(100 * time.Millisecond):
 			}
