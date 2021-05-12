@@ -4,7 +4,6 @@ import (
 	"strconv"
 
 	"github.com/Joker666/cogman/util"
-
 	"github.com/streadway/amqp"
 )
 

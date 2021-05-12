@@ -2,7 +2,6 @@ package cogman
 
 import (
 	"context"
-	"github.com/Joker666/cogman/rest"
 	"strconv"
 	"sync"
 	"time"
@@ -11,8 +10,8 @@ import (
 	"github.com/Joker666/cogman/config"
 	"github.com/Joker666/cogman/infra"
 	"github.com/Joker666/cogman/repo"
+	"github.com/Joker666/cogman/rest"
 	"github.com/Joker666/cogman/util"
-
 	"github.com/streadway/amqp"
 )
 
