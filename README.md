@@ -3,23 +3,25 @@
 ![logo](https://i.imgur.com/by0sIiG.png)
 
 ## Table of Contents
+
 - [How to Use](#how-to-use)
 - [Motivation](#motivation)
 - [Requirements](#requirements)
 - [Features](#features)
 - [Examples](#examples)
 - [Setup](#setup)
-    - [Config](#config)
-    - [Client/Server](#clientserver)
-    - [Task](#ask)
-    - [Worker/Task Hander](#workertask-handler)
-    - [Register The Handlers](#register-the-handlers)
-    - [Send task](#send-task)
+  - [Config](#config)
+  - [Client/Server](#clientserver)
+  - [Task](#ask)
+  - [Worker/Task Hander](#workertask-handler)
+  - [Register The Handlers](#register-the-handlers)
+  - [Send task](#send-task)
 - [Feature Comparison](#feature-comparison)
 - [Contribution](#contribution)
 - [License](#license)
 
-## How to use: 
+## How to use:
+
 First add it to `$GOPATH`
 
 ```
@@ -27,7 +29,7 @@ go get github.com/Joker666/cogman
 ```
 
 Then add [configuration](#Config) for rabbitmq for messaging, redis as backend, optionally mongodb as backend for re-enqueuing feature. <br />
-Start the server to consume the tasks and start the client session to send tasks to server. [Start server and client](#clientserver).  <br />
+Start the server to consume the tasks and start the client session to send tasks to server. [Start server and client](#clientserver). <br />
 Write [task handlers](#workertask-handler) and [register](#register-the-handlers) them.
 [Send the tasks](#send-task) to process.
 And voila!, you have set up the simplest background processing job server.
@@ -36,14 +38,16 @@ You should see something like this when everything is up and running
 ![List of services](https://i.imgur.com/AyIJkW8.png)
 
 ## Motivation
-In python world you have [Celery](https://github.com/celery/celery), in Ruby world you have [Resque](https://github.com/resque/resque), [SideKiq](https://github.com/mperham/sidekiq), in C# [Hangfire](https://github.com/HangfireIO/Hangfire). All of them had one thing in common, simple interface to get started. When building products in Golang, this was apparent that, there is no library with a simple interface. We have Machinery, which is an excellent library, but has a steep learning curve. Also it has tonnes of features backed in that you do not need and but is required anyway.
+
+In python world you have [Celery](https://github.com/celery/celery), in Ruby world you have [Resque](https://github.com/resque/resque), [SideKiq](https://github.com/mperham/sidekiq), in C# [Hangfire](https://github.com/HangfireIO/Hangfire). All of them had one thing in common, simple interface to get started. When building products in Golang, this was apparent that, there is no library with a simple interface. We have Machinery, which is an excellent library, but has a steep learning curve. Also it has tonnes of features baked in that you do not need but is required anyway.
 
 Also the way it handled processing of future tasks with RabbitMQ's [Dead Letter Exchange](https://www.rabbitmq.com/dlx.html), we were not very fond of it. So we decided to make our own job processing library. This is a opinionated library as it uses [RabbitMQ](https://www.rabbitmq.com/) as the message broker and [Redis](https://redis.io/) and optionally [MongoDB](https://www.mongodb.com/) backend for more features. This setup has worked great for us in production and under stress and I believe this can work for large tasks as well
 
 ## Requirements
+
 - Go
-- RabbitMQ  
-- Redis  
+- RabbitMQ
+- Redis
 - MongoDB (optional)
 
 ## Features
@@ -61,15 +65,18 @@ Also the way it handled processing of future tasks with RabbitMQ's [Dead Letter 
 - [x] Rest API
 
 ## Examples
+
 - [Simple use](https://github.com/Joker666/cogman/tree/master/example/simple)
 - [Queue type](https://github.com/Joker666/cogman/tree/master/example/queue)
 - [Client & Server](https://github.com/Joker666/cogman/tree/master/example/client-server)
 - [Task & Task Handler](https://github.com/Joker666/cogman/tree/master/example/tasks)
 
 ## Setup
-### Config 
+
+### Config
 
 Cogman api config example.
+
 ```go
 cfg := &config.Config{
     ConnectionTimeout: time.Minute * 10, // default value 10 minutes
@@ -130,6 +137,7 @@ go func() {
 ```
 
 ### Task
+
 Tasks are grouped by two priority level. Based on that it will be assigned to a queue.
 
 ```go
@@ -171,6 +179,7 @@ func (h HandlerFunc) Do(ctx context.Context, payload []byte) error {
 ```
 
 ### Register The Handlers
+
 ```go
 // Register task handler from Server side
 server.Register(taskName, handler)
@@ -180,6 +189,7 @@ server.Register(taskName, handlerFunc)
 ### Send Task
 
 Sending task using Cogman API:
+
 ```go
 if err := cogman.SendTask(*task, handler); err != nil {
 	log.Fatal(err)
@@ -206,7 +216,7 @@ if err := client.SendTask(task); err != nil {
 Cogman queue type:
 
 ```
-- High_Priority_Queue [default Queue]  
+- High_Priority_Queue [default Queue]
 - Low_Priority_Queue  [lazy Queue]
 ```
 
@@ -229,30 +239,29 @@ All offline task will be re-queue after connection re-established.
 Cogman fetches all the offline tasks from mongo logs, and re-initiate them. Mongo connection required here.
 For re-enqueuing, task retry count would not change.
 
-
 ## Feature Comparison
 
 Comparison among the other job/task process runner.
 
-| Feature                  | Cogman      | Machinery     |
-| :------------------------|:-----------:|:-------------:|
-| Backend                  | redis/mongo | redis         |
-| Priorities               |      ✓      | ✓             |
-| Re-Enqueue               |      ✓      |               |
-| Concurrency              |      ✓      | ✓             |
-| Re-Connection            |      ✓      |               |
-| Delayed jobs             |             | ✓             |
-| Concurrent client/server |      ✓      |               |
-| Re-try                   |      ✓      | ✓             |
-| Persistence              |      ✓      | ✓             |
-| UI                       |             |               |
-| Rest API                 |      ✓      |               |
-| Chain                    |             | ✓             |
-| Chords                   |             | ✓             |
-| Groups                   |             | ✓             |
-
+| Feature                  |   Cogman    | Machinery |
+| :----------------------- | :---------: | :-------: |
+| Backend                  | redis/mongo |   redis   |
+| Priorities               |      ✓      |     ✓     |
+| Re-Enqueue               |      ✓      |           |
+| Concurrency              |      ✓      |     ✓     |
+| Re-Connection            |      ✓      |           |
+| Delayed jobs             |             |     ✓     |
+| Concurrent client/server |      ✓      |           |
+| Re-try                   |      ✓      |     ✓     |
+| Persistence              |      ✓      |     ✓     |
+| UI                       |             |           |
+| Rest API                 |      ✓      |           |
+| Chain                    |             |     ✓     |
+| Chords                   |             |     ✓     |
+| Groups                   |             |     ✓     |
 
 ## Contribution
+
 Want to contribute? Great!
 
 To fix a bug or enhance an existing module, follow these steps:
@@ -263,11 +272,12 @@ To fix a bug or enhance an existing module, follow these steps:
 - Add changes to reflect the changes made
 - Commit your changes (`git commit -am 'Improve feature'`)
 - Push to the branch (`git push origin improve-feature`)
-- Create a Pull Request 
+- Create a Pull Request
 
 ### Bug / Feature Request
+
 If you find a bug, kindly open an issue [here](https://github.com/Joker666/cogman/issues/new).<br/>
-If you'd like to request/add a new function, feel free to do so by opening an issue [here](https://github.com/Joker666/cogman/issues/new). 
+If you'd like to request/add a new function, feel free to do so by opening an issue [here](https://github.com/Joker666/cogman/issues/new).
 
 ## [License](https://github.com/Joker666/cogman/blob/master/LICENSE.md)
 
